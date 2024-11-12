@@ -1,7 +1,10 @@
 import json
 import logging
+import os
 
 from dotenv import load_dotenv
+
+from utils.common import dict_to_str
 
 load_dotenv()
 
@@ -10,11 +13,8 @@ from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import (
-    CronTrigger,
-)  # allows us to specify a recurring time for execution
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import Depends, FastAPI, HTTPException, Query
-from loguru import logger
 from sqlmodel import Session, select
 
 from database.connection import create_db_and_tables, get_session
@@ -23,11 +23,17 @@ from services.telegram import send_message
 from services.tracker import bd_track
 from tasks.tracker import update_packages_status
 
+SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
+
 # Set up the scheduler
 scheduler = AsyncIOScheduler()
-# every 10 minutes
+# every 1 minute
 trigger = CronTrigger.from_crontab("*/1 * * * *")
-scheduler.add_job(update_packages_status, trigger)
+scheduler.add_job(
+    update_packages_status,
+    "interval",
+    seconds=SLEEP_INTERVAL,
+)
 scheduler.start()
 
 app = FastAPI()
@@ -84,7 +90,7 @@ async def track_package(num: str, session: Session = Depends(get_session)):
         session.add(package)
         session.commit()
 
-    await send_message(f"Package {num} updated to {status[0]['details']}")
+    await send_message(f"Package {num} updated to {dict_to_str(status[0])}")
 
     return status
 

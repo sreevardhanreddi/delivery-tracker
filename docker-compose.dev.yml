@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    ports:
+      - 8881:80
+    volumes:
+      - .:/code/app
+    restart: always
+    env_file:
+      - .env
+
+

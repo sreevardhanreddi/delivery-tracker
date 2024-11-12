@@ -8,6 +8,7 @@ from database.connection import engine
 from models.track_package import TrackPackage
 from services.telegram import send_message
 from services.tracker import bd_track
+from utils.common import dict_to_str
 
 
 async def update_packages_status():
@@ -18,19 +19,17 @@ async def update_packages_status():
             status = bd_track(package.number)
             if status is None:
                 continue
-            logger.info(f"Package {package.number} status: {status[0]['details']}")
-            if package.status == json.dumps(status):
-                continue
+            logger.info(f"Package {package.number} status: {dict_to_str(status[0])}")
             if status[0]["details"] != package.status:
                 package.events = json.dumps(status)
                 package.status = status[0]["details"]
                 session.add(package)
                 session.commit()
                 logger.info(
-                    f"Package {package.number} updated to {status[0]['details']}"
+                    f"Package {package.number} updated to {dict_to_str(status[0])}"
                 )
                 await send_message(
-                    f"Package {package.number} updated to {status[0]['details']}"
+                    f"Package {package.number} updated to {dict_to_str(status[0])}"
                 )
 
             if str(status[0]["details"]) == "Shipment Delivered":
