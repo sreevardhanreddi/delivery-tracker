@@ -6,4 +6,6 @@ services:
     restart: always
     env_file:
       - .env
+    volumes:
+      - ./database.db:/code/database.db
 

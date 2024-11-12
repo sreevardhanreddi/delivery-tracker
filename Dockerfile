@@ -4,6 +4,8 @@ FROM python:${VERSION}-slim-bullseye
 
 WORKDIR /code
 
+RUN apt-get update && apt-get install -y build-essential
+
 COPY ./requirements.txt /code/requirements.txt
 
 RUN pip install -r /code/requirements.txt

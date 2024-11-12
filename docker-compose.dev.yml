@@ -3,8 +3,10 @@ services:
     build: .
     ports:
       - 8881:80
+    command: "fastapi dev code/main.py --proxy-headers --host 0.0.0.0 --port 80"
     volumes:
       - .:/code/app
+      - ./database.db:/code/database.db
     restart: always
     env_file:
       - .env
