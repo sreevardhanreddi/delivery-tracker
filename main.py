@@ -34,7 +34,6 @@ scheduler.add_job(
     "interval",
     seconds=SLEEP_INTERVAL,
 )
-scheduler.start()
 
 app = FastAPI()
 
@@ -56,6 +55,7 @@ app = FastAPI(
 @app.on_event("startup")
 async def on_startup():
     create_db_and_tables()
+    scheduler.start()
 
 
 @app.get("/health")
