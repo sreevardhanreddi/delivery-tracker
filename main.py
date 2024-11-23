@@ -96,9 +96,9 @@ async def track_package(num: str, session: Session = Depends(get_session)):
 
 
 @app.get("/dtdc/track/{num}")
-async def track_package(num: str, session: Session = Depends(get_session)):
+async def track_package_dtdc(num: str, session: Session = Depends(get_session)):
 
-    status = bd_track(num)
+    status = dtdc_track(num)
     if status is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
