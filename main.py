@@ -20,7 +20,7 @@ from sqlmodel import Session, select
 from database.connection import create_db_and_tables, get_session
 from models.track_package import TrackPackage
 from services.telegram import send_message
-from services.tracker import bd_track
+from services.tracker import bd_track, dtdc_track
 from tasks.tracker import update_packages_status
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
@@ -84,6 +84,38 @@ async def track_package(num: str, session: Session = Depends(get_session)):
         package = TrackPackage(
             number=num,
             description="Bluedart",
+            events=json.dumps(status),
+            status=status[0]["details"],
+        )
+        session.add(package)
+        session.commit()
+
+    await send_message(f"Package {num} updated to {dict_to_str(status[0])}")
+
+    return status
+
+
+@app.get("/dtdc/track/{num}")
+async def track_package(num: str, session: Session = Depends(get_session)):
+
+    status = bd_track(num)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+
+    package = session.exec(
+        select(TrackPackage).where(TrackPackage.number == num)
+    ).first()
+
+    if package:
+        package.events = json.dumps(status)
+        package.status = status[0]["details"]
+        session.add(package)
+        session.commit()
+
+    else:
+        package = TrackPackage(
+            number=num,
+            description="DTDC",
             events=json.dumps(status),
             status=status[0]["details"],
         )

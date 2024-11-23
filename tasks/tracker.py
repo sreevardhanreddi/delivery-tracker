@@ -32,7 +32,10 @@ async def update_packages_status():
                     f"Package {package.number} updated to {dict_to_str(status[0])}"
                 )
 
-            if str(status[0]["details"]) == "Shipment Delivered":
+            if str(status[0]["details"]) in [
+                "Shipment Delivered",
+                "Successfully Delivered",
+            ]:
                 logger.info(f"Package {package.number} delivered")
                 await send_message(f"Package {package.number} delivered")
                 logger.info(f"Deleting package {package.number}")
