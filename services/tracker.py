@@ -86,7 +86,7 @@ def dtdc_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
 
             status.append(
                 {
-                    "location": "{} {}".format(item.get("origin"), item.get("des", "")),
+                    "location": "{}".format(item.get("dest") or item.get("origin", "")),
                     "details": "{}".format(
                         # item.get("deliveryStatus"),
                         item.get("activityType"),

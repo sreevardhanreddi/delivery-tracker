@@ -23,7 +23,7 @@ async def update_packages_status():
             logger.info(
                 f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(status[0])}"
             )
-            if status[0]["details"] != package.status:
+            if status[0] != json.loads(package.events)[0]:
                 package.events = json.dumps(status)
                 package.status = status[0]["details"]
                 session.add(package)

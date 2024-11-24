@@ -73,7 +73,7 @@ def list_packages(
 
 
 @app.post("/track", response_model=TrackPackage)
-def create_package(
+async def create_package(
     package: CreatePackage,
     session: Session = Depends(get_session),
 ):
@@ -101,6 +101,9 @@ def create_package(
     session.commit()
     session.refresh(package_obj)
 
+    await send_message(
+        f"Package {package_obj.number} {package_obj.service} {package_obj.description} updated to {dict_to_str(status[0])}"
+    )
     return package_obj
 
 
