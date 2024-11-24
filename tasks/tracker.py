@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from database.connection import engine
 from models.track_package import TrackPackage
 from services.telegram import send_message
-from services.tracker import bd_track
+from services.tracker import bd_track, track_all
 from utils.common import dict_to_str
 
 
@@ -16,20 +16,23 @@ async def update_packages_status():
     with Session(engine) as session:
         packages = session.exec(select(TrackPackage)).all()
         for package in packages:
-            status = bd_track(package.number)
+            status, service = track_all(package.number)
             if status is None:
                 continue
-            logger.info(f"Package {package.number} status: {dict_to_str(status[0])}")
+            # logger.info(f"Package {package.number} status: {dict_to_str(status[0])}")
+            logger.info(
+                f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(status[0])}"
+            )
             if status[0]["details"] != package.status:
                 package.events = json.dumps(status)
                 package.status = status[0]["details"]
                 session.add(package)
                 session.commit()
                 logger.info(
-                    f"Package {package.number} updated to {dict_to_str(status[0])}"
+                    f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(status[0])}"
                 )
                 await send_message(
-                    f"Package {package.number} updated to {dict_to_str(status[0])}"
+                    f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(status[0])}"
                 )
 
             if str(status[0]["details"]) in [

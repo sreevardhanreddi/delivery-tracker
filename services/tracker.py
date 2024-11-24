@@ -1,9 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import bs4
 import requests
 from loguru import logger
 
 
-def bd_track(num: str) -> list[dict] | None:
+def bd_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
     try:
         res = requests.get(
             "https://www.bluedart.com/trackdartresultthirdparty?trackFor=0&trackNo={}".format(
@@ -12,12 +14,12 @@ def bd_track(num: str) -> list[dict] | None:
         )
         if res.status_code != 200:
             logger.error("Error in fetching the page")
-            return None
+            return None, None
         soup = bs4.BeautifulSoup(res.text, "html.parser")
         status_events = soup.find("div", id="SCAN{}".format(num))
         if status_events is None:
             logger.error("Error in fetching the status")
-            return None
+            return None, None
 
         # convert the table to a list of dictionaries
         status = []
@@ -36,17 +38,17 @@ def bd_track(num: str) -> list[dict] | None:
                 }
             )
 
-        return status
+        return status, "bluedart"
     except Exception as e:
-        logger.error(e)
-        return None
+        logger.error(f"An error occurred fetching from bluedart: {e}")
+        return None, None
 
 
-def dtdc_track(consignment_no: str) -> list[dict] | None:
+def dtdc_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
     try:
         # Define the URL and headers
         url = "https://trackcom.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=getLoadMovementDetails&cnNo={}".format(
-            consignment_no
+            num
         )
         headers = {
             "Accept": "text/javascript, text/html, application/xml, text/xml, */*",
@@ -55,7 +57,7 @@ def dtdc_track(consignment_no: str) -> list[dict] | None:
             "Content-Length": "0",
             "Content-type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": "https://trackcom.dtdc.com",
-            "Referer": f"https://trackcom.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=showCITrackingDetails&cnNo={consignment_no}&cType=Consignment",
+            "Referer": f"https://trackcom.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=showCITrackingDetails&cnNo={num}&cType=Consignment",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
@@ -73,12 +75,14 @@ def dtdc_track(consignment_no: str) -> list[dict] | None:
             logger.error(
                 f"Failed to fetch data from DTDC API. Status code: {res.status_code}"
             )
-            return None
+            return None, None
 
         data = res.json()
         # Convert the table to a list of dictionaries
         status = []
         for item in data:
+            if item.get("activityType") == "No Data available":
+                return None, None
 
             status.append(
                 {
@@ -92,8 +96,21 @@ def dtdc_track(consignment_no: str) -> list[dict] | None:
                 }
             )
 
-        return status
+        return status, "dtdc"
 
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        return None
+        logger.error(f"An error occurred fetching from dtdc: {e}")
+        return None, None
+
+
+def track_all(num: str):
+    status = None, None
+    tasks = [bd_track, dtdc_track]
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = [executor.submit(task, num) for task in tasks]
+        for future in futures:
+            events, service = future.result()
+            if service is not None:
+                status = events, service
+
+    return status
