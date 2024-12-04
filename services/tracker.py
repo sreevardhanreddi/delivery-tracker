@@ -140,7 +140,7 @@ def ecom_express_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
         if data.get("status") == "AWB_NOT_FOUND":
             return None, None
         shipment_status = data.get("result", {}).get("shipment_status", [])
-        shipment_status[::-1]
+        shipment_status.reverse()
         for item in shipment_status:
 
             date, time = item.get("added_on").split(" ")
