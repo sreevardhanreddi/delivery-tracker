@@ -103,9 +103,66 @@ def dtdc_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
         return None, None
 
 
+def ecom_express_track(num: str) -> tuple[list[dict], str] | tuple[None, None]:
+    try:
+        json_data = {"awb_field": num}
+        headers = {
+            "accept": "application/json",
+            "accept-language": "en-US,en;q=0.9",
+            "content-type": "application/json",
+            "origin": "https://www.ecomexpress.in",
+            "priority": "u=1, i",
+            "referer": "https://www.ecomexpress.in/tracking/?awb_field=3375548584",
+            "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        }
+        res = requests.post(
+            "https://www.ecomexpress.in/api/track-awb", json=json_data, headers=headers
+        )
+        if res.status_code != 200:
+            logger.error(
+                f"Failed to fetch data from ECOM Express API. Status code: {res.status_code}"
+            )
+            return None, None
+
+        data = res.json()
+        if res.status_code != 200:
+            logger.error("Error in fetching the page")
+            return None, None
+
+        # convert the table to a list of dictionaries
+        status = []
+        if data.get("status") == "AWB_NOT_FOUND":
+            return None, None
+        shipment_status = data.get("result", {}).get("shipment_status", [])
+        shipment_status[::-1]
+        for item in shipment_status:
+
+            date, time = item.get("added_on").split(" ")
+            status.append(
+                {
+                    "location": "{}".format(item.get("service_center_name")),
+                    "details": "{}".format(item.get("status_name")),
+                    "date": "{}".format(date),
+                    "time": "{}".format(time),
+                }
+            )
+
+        return status, "ecom_express"
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from ecom_express: {e}")
+        return None, None
+
+
 def track_all(num: str):
     status = None, None
-    tasks = [bd_track, dtdc_track]
+    tasks = [bd_track, dtdc_track, ecom_express_track]
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         futures = [executor.submit(task, num) for task in tasks]
         for future in futures:
