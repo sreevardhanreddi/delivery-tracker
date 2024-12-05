@@ -1,11 +1,10 @@
-import json
 import logging
 import os
 
 from dotenv import load_dotenv
 from loguru import logger
 
-from utils.common import dict_to_str
+from utils.common import dict_to_str, json_dumps
 
 load_dotenv()
 
@@ -21,7 +20,13 @@ from sqlmodel import Session, select
 from database.connection import create_db_and_tables, get_session
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
-from services.tracker import bd_track, dtdc_track, ecom_express_track, track_all
+from services.tracker import (
+    bd_track,
+    delhivery_track,
+    dtdc_track,
+    ecom_express_track,
+    track_all,
+)
 from tasks.tracker import update_packages_status
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
@@ -83,26 +88,28 @@ async def create_package(
     ).first():
         raise HTTPException(status_code=400, detail="Package already exists")
 
-    status, service = track_all(package.number)
-    if status is None:
+    status = track_all(package.number)
+    events = status.get("events", None)
+
+    if events is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
     json_events = ""
     if status:
-        json_events = json.dumps(status)
+        json_events = json_dumps(events)
     package_obj = TrackPackage(
         number=package.number,
-        service=service or "",
+        service=status.get("service", ""),
         description=package.description,
         events=json_events,
-        status=status[0]["details"],
+        status=events[0]["details"],
     )
     session.add(package_obj)
     session.commit()
     session.refresh(package_obj)
 
     await send_message(
-        f"Package {package_obj.number} {package_obj.service} {package_obj.description} updated to {dict_to_str(status[0])}"
+        f"Package {package_obj.number} {package_obj.service} {package_obj.description} updated to {dict_to_str(events[0])}"
     )
     return package_obj
 
