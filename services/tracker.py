@@ -162,8 +162,11 @@ def ecom_express_track(num: str) -> dict:
             date_time = parse_date_time_string(date_time)
             events.append(
                 {
-                    "location": "{}".format(item.get("service_center_name")),
-                    "details": "{}".format(item.get("status_name")),
+                    "location": "{}".format(item.get("service_center_name", "")),
+                    "details": "{}".format(
+                        item.get("external_status_desc", "")
+                        or item.get("status_name", "")
+                    ),
                     "date": "{}".format(date),
                     "time": "{}".format(time),
                     "date_time": date_time,
