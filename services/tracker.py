@@ -230,7 +230,6 @@ def delhivery_track(num: str) -> dict:
             return status
 
         tracking_events = data["data"][0]["trackingStates"][-1]
-        print(tracking_events)
 
         # delhivery has a different format
         date_time = tracking_events["scans"][-1]["scanDateTime"]
