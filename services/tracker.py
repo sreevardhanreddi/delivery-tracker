@@ -95,7 +95,6 @@ def dtdc_track(num: str) -> dict:
             return status
 
         data = res.json()
-        print(data)
         # Convert the table to a list of dictionaries
         events = []
         for item in data:
