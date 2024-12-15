@@ -6,6 +6,8 @@ from loguru import logger
 
 from utils.common import parse_date_time_string
 
+REQUEST_TIMEOUT = 120
+
 
 def get_common_headers():
     return {
@@ -35,6 +37,7 @@ def bd_track(num: str) -> dict:
                 num
             ),
             headers=headers,
+            timeout=REQUEST_TIMEOUT,
         )
         if res.status_code != 200:
             logger.error("Error in fetching the page")
@@ -87,7 +90,12 @@ def dtdc_track(num: str) -> dict:
         }
 
         # Make the POST request
-        res = requests.post(url, headers=headers, verify=False)
+        res = requests.post(
+            url,
+            headers=headers,
+            verify=False,
+            timeout=REQUEST_TIMEOUT,
+        )
         if res.status_code != 200:
             logger.error(
                 f"Failed to fetch data from DTDC API. Status code: {res.status_code}"
@@ -149,7 +157,10 @@ def ecom_express_track(num: str) -> dict:
             **get_common_headers(),
         }
         res = requests.post(
-            "https://www.ecomexpress.in/api/track-awb", json=json_data, headers=headers
+            "https://www.ecomexpress.in/api/track-awb",
+            json=json_data,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
         )
         if res.status_code != 200:
             logger.error(
@@ -211,6 +222,7 @@ def delhivery_track(num: str) -> dict:
             "https://dlv-api.delhivery.com/v3/unified-tracking",
             params=params,
             headers=headers,
+            timeout=REQUEST_TIMEOUT,
         )
         if res.status_code != 200:
             logger.error(
@@ -231,7 +243,10 @@ def delhivery_track(num: str) -> dict:
         tracking_events = data["data"][0]["trackingStates"][-1]
 
         # delhivery has a different format
-        date_time = tracking_events["scans"][-1]["scanDateTime"]
+        date_time = (
+            tracking_events["scans"][-1]["scanDateTime"]
+            or data["data"][0]["status"]["statusDateTime"]
+        )
         date_time = parse_date_time_string(date_time)
         details = tracking_events["scans"][-1]["scanNslRemark"]
         location = tracking_events["scans"][-1]["cityLocation"]
