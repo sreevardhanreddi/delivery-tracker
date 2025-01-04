@@ -1,9 +1,11 @@
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import bs4
 import requests
 from loguru import logger
 
+from services.selenium_tracker import dtdc_track_selenium_srv
 from utils.common import parse_date_time_string
 
 REQUEST_TIMEOUT = 120
@@ -134,25 +136,61 @@ def dtdc_track(num: str) -> dict:
     return status
 
 
+def dtdc_track_selenium(num: str) -> dict:
+    status = {"events": None, "service": None}
+    try:
+        html_response = dtdc_track_selenium_srv(num)
+        soup = bs4.BeautifulSoup(html_response, "html.parser")
+        # Find relevant sections for location and datetime details
+        timeline_steps = soup.find_all("div", class_="timeline-step")
+        timeline_steps = timeline_steps[0 : len(timeline_steps) // 2]
+        location_details = []
+        for item in timeline_steps:
+            # Extract details
+            details = item.find("p", class_="h6 milestone_title text-dark")
+            if details:
+                details = details.get_text(strip=True)
+
+            # Extract location and datetime
+            location_and_datetime = (
+                item.find("p", class_="h6 text-muted mb-1 mb-lg-3")
+                .decode_contents()
+                .split("<br/>")
+            )
+
+            if len(location_and_datetime) != 2:
+                continue
+            location = location_and_datetime[0].strip()
+            datetime_text = location_and_datetime[1].strip()
+
+            parsed_datetime = None
+            # Parse datetime
+            if datetime_text:
+                date_string = re.sub(
+                    r"(\d)(st|nd|rd|th)", r"\1", datetime_text
+                )  # remove ordinal suffix
+                date_string = date_string.replace("@", "")  # remove '@' symbol
+                parsed_datetime = parse_date_time_string(date_string)
+
+            parsed_data = {
+                "location": location,
+                "datetime": parsed_datetime,
+                "details": details,
+            }
+            location_details.append(parsed_data)
+
+        status["events"] = location_details
+        status["service"] = "dtdc"
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from dtdc: {e}")
+    return status
+
+
 def ecom_express_track(num: str) -> dict:
     status = {"events": None, "service": None}
     try:
         json_data = {"awb_field": num}
-        # headers = {
-        #     "accept": "application/json",
-        #     "accept-language": "en-US,en;q=0.9",
-        #     "content-type": "application/json",
-        #     "origin": "https://www.ecomexpress.in",
-        #     "priority": "u=1, i",
-        #     "referer": "https://www.ecomexpress.in/tracking/?awb_field=3375548584",
-        #     "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-        #     "sec-ch-ua-mobile": "?0",
-        #     "sec-ch-ua-platform": '"macOS"',
-        #     "sec-fetch-dest": "empty",
-        #     "sec-fetch-mode": "cors",
-        #     "sec-fetch-site": "same-origin",
-        #     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        # }
         headers = {
             **get_common_headers(),
         }
@@ -269,7 +307,13 @@ def delhivery_track(num: str) -> dict:
 
 def track_all(num: str) -> dict:
     status = {"events": None, "service": None}
-    tasks = [bd_track, dtdc_track, ecom_express_track, delhivery_track]
+    tasks = [
+        bd_track,
+        # dtdc_track,
+        dtdc_track_selenium,
+        ecom_express_track,
+        delhivery_track,
+    ]
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         futures = [executor.submit(task, num) for task in tasks]
         for future in futures:

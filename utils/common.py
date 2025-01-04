@@ -15,6 +15,7 @@ def dict_to_str(d: dict) -> str:
 
 def parse_date_time_string(date_time_string):
     date_formats = [
+        "%a, %d %b'%y %I:%M %p",
         "%Y-%m-%d %H:%M:%S",  # Format: 2024-12-05 11:03:59
         "%d %b %Y %H:%M",  # Format: 07 Oct 2024 22:24
         "%d-%m-%Y %H:%M:%S",  # Format: 05-12-2024 11:03:59
