@@ -14,7 +14,9 @@ from utils.common import dict_to_str, json_dumps
 async def update_packages_status():
     logger.info("Running the task")
     with Session(engine) as session:
-        packages = session.exec(select(TrackPackage)).all()
+        packages = session.exec(
+            select(TrackPackage).where(TrackPackage.status != "Delivered")
+        ).all()
         for package in packages:
             status = track_all(package.number)
             events = status.get("events", None)
@@ -44,6 +46,8 @@ async def update_packages_status():
             ]:
                 logger.info(f"Package {package.number} delivered")
                 await send_message(f"Package {package.number} delivered")
-                logger.info(f"Deleting package {package.number}")
-                session.delete(package)
+                logger.info(f"Updating package status {package.number} to Delivered.")
+                package.status = "Delivered"
+                session.add(package)
+                # session.delete(package)
                 session.commit()

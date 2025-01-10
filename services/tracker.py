@@ -179,6 +179,7 @@ def dtdc_track_selenium(num: str) -> dict:
             }
             location_details.append(parsed_data)
 
+        location_details.reverse()
         status["events"] = location_details
         status["service"] = "dtdc"
 
@@ -305,6 +306,49 @@ def delhivery_track(num: str) -> dict:
     return status
 
 
+def shadow_fax_track(num: str) -> dict:
+    status = {"events": None, "service": None}
+    try:
+        headers = {
+            **get_common_headers(),
+            "authorization": "Token cePcVR7z7FIETB4PxguHC2YJGk6NncHnByrJttgRIUqNxfWezuzAUvtALyqcHJEC",
+        }
+        res = requests.get(
+            "https://saruman.shadowfax.in/web_app/delivery/track/{}/".format(num),
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if res.status_code != 200:
+            logger.error("Error in fetching the data from shadowfax")
+            return status
+
+        data = res.json()
+        tracking_events = data["data"][0]
+
+        sub_tracking_events = tracking_events.get("sub_status", [])
+        # convert the table to a list of dictionaries
+        events = []
+        for i, item in enumerate(sub_tracking_events):
+
+            time = tracking_events["time"][i]
+
+            date_time = parse_date_time_string(time)
+            events.append(
+                {
+                    # "location": item,
+                    "details": item,
+                    "date_time": date_time,
+                }
+            )
+        status["events"] = events
+        status["service"] = "shadow_fax"
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from shadow fax: {e}")
+
+    return status
+
+
 def track_all(num: str) -> dict:
     status = {"events": None, "service": None}
     tasks = [
@@ -313,6 +357,7 @@ def track_all(num: str) -> dict:
         dtdc_track_selenium,
         ecom_express_track,
         delhivery_track,
+        shadow_fax_track,
     ]
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         futures = [executor.submit(task, num) for task in tasks]

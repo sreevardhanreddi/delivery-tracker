@@ -20,6 +20,7 @@ def parse_date_time_string(date_time_string):
         "%d %b %Y %H:%M",  # Format: 07 Oct 2024 22:24
         "%d-%m-%Y %H:%M:%S",  # Format: 05-12-2024 11:03:59
         "%Y-%m-%dT%H:%M:%S.%f",  # ISO 8601 Format: 2024-12-05T05:11:40.736000
+        "%Y-%m-%dT%H:%M:%S",
     ]
 
     # Try each format
