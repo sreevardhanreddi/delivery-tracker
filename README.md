@@ -1,13 +1,37 @@
-# Bluedart Package Tracking API
+# Indian Courier Tracking Hub
 
-This project is a FastAPI-based application designed to track Bluedart packages and send Telegram messages when the package details are updated. The application periodically checks the status of packages and updates the database with the latest information. If there are any changes in the package status, a notification is sent to a specified Telegram channel.
+A comprehensive tracking system that integrates with multiple Indian courier services, providing unified tracking capabilities, automated status updates, and real-time notifications. The system periodically checks package statuses and sends updates via Telegram when changes are detected.
 
 ## Features
 
-- **Track Bluedart Packages**: Fetch and store the status of Bluedart packages.
-- **Periodic Status Updates**: Automatically update package statuses at regular intervals.
-- **Telegram Notifications**: Send notifications to a Telegram channel when package details are updated.
-- **CRUD Operations**: Create, read, update, and delete package tracking information via API endpoints.
+### Carrier Support
+
+Currently integrated with major Indian logistics providers:
+
+- Bluedart
+- DTDC (with Selenium-based tracking)
+- Delhivery
+- ShadowFax
+- Ecom Express
+
+### Core Functionality
+
+- **Automated Tracking**: Periodic status checks for all active packages
+- **Real-time Notifications**: Instant Telegram updates on status changes
+- **Status History**: Complete tracking history for each package
+- **Delivery Detection**: Automatic package status management upon delivery
+- **RESTful API**: Comprehensive endpoints for tracking management
+
+## Technical Stack
+
+- **Backend Framework**: FastAPI
+- **Database**: SQLModel with SQLite
+- **Task Scheduling**: AsyncIO Scheduler (APScheduler)
+- **Web Scraping**:
+  - Selenium with Chrome for Testing
+  - BeautifulSoup4 for HTML parsing
+- **Containerization**: Docker with multi-stage builds
+- **Notifications**: Telegram Bot API
 
 ## Environment Variables
 
