@@ -15,7 +15,6 @@ class TrackPackage(SQLModel, table=True):
     status: str
     created_at: datetime = datetime.now()
     updated_at: datetime = datetime.now()
-    status: str = Field(default="")
 
 
 class CreatePackage(BaseModel):

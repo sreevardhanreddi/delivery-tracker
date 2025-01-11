@@ -43,6 +43,7 @@ async def update_packages_status():
                 "Successfully Delivered",
                 "Delivered",
                 "Shipment delivered",
+                "Shipment has been delivered",
             ]:
                 logger.info(f"Package {package.number} delivered")
                 await send_message(f"Package {package.number} delivered")
