@@ -1,12 +1,49 @@
 import json
+import os
+import subprocess
 import time
 
 from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+
+
+def find_chromedriver():
+    """Find the ChromeDriver executable path."""
+    # Check common locations
+    possible_paths = [
+        "/usr/bin/chromedriver",
+        "/usr/local/bin/chromedriver",
+        "/usr/lib/chromium-browser/chromedriver",
+        "/usr/lib/chromium/chromedriver",
+        "/usr/lib/chromium-driver/chromedriver",
+    ]
+
+    # Check environment variable
+    if os.environ.get("CHROMEDRIVER_PATH"):
+        return os.environ.get("CHROMEDRIVER_PATH")
+
+    # Check which command
+    try:
+        result = subprocess.run(
+            ["which", "chromedriver"], capture_output=True, text=True, check=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    # Check possible paths
+    for path in possible_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+
+    # If not found, return None
+    return None
 
 
 def wait_for_network_idle(driver, timeout=30):
@@ -70,13 +107,32 @@ def dtdc_track_srv(tracking_number: str):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    # Use Chromium binary if available
+    if os.environ.get("CHROME_BIN"):
+        chrome_options.binary_location = os.environ.get("CHROME_BIN")
+        logger.info(f"Using Chromium binary at: {os.environ.get('CHROME_BIN')}")
+
     chrome_options.set_capability(
         "goog:loggingPrefs", {"performance": "ALL", "browser": "ALL"}
     )
 
     try:
         logger.info("Launching browser...")
-        driver = webdriver.Chrome(options=chrome_options)
+
+        # Find ChromeDriver path
+        chromedriver_path = find_chromedriver()
+        if chromedriver_path:
+            logger.info(f"Using ChromeDriver at: {chromedriver_path}")
+            service = Service(executable_path=chromedriver_path)
+        else:
+            logger.warning("ChromeDriver path not found, using default Service")
+            service = Service()
+
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(link)
 
         # Wait for and click the chatbot icon

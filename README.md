@@ -46,6 +46,8 @@ The application uses the following environment variables, which should be define
 
 ## Installation
 
+### Local Installation
+
 1. Clone the repository
 2. Create a virtual environment and activate it:
    ```bash
@@ -68,10 +70,38 @@ The application uses the following environment variables, which should be define
    ```
 
 5. Copy `.env.example` to `.env` and configure your environment variables
-6. Run the application using Docker or directly with FastAPI:
+6. Run the application using FastAPI:
    ```bash
    uvicorn main:app --reload
    ```
+
+### Docker Installation
+
+The application is configured to run in Docker with Selenium support. The Dockerfile includes:
+
+- Installation of Google Chrome and ChromeDriver
+- Configuration for headless browser operation
+- Shared memory allocation for stable operation
+
+To run the application using Docker:
+
+```bash
+# For development
+docker-compose -f docker-compose.dev.yml up
+
+# For production
+docker-compose -f docker-compose.prod.yml up
+```
+
+To test the Selenium setup in the Docker container:
+
+```bash
+# Build the container
+docker-compose -f docker-compose.dev.yml build
+
+# Run the test script
+docker-compose -f docker-compose.dev.yml run api python test_selenium.py
+```
 
 ## Usage
 
@@ -110,6 +140,31 @@ uvicorn main:app --reload
 ## Scheduler
 
 The application uses APScheduler to periodically check and update package statuses. The scheduler is configured to run every minute and can be adjusted through the `SLEEP_INTERVAL` environment variable.
+
+## Troubleshooting
+
+### Selenium Issues in Docker
+
+If you encounter Selenium-related errors in Docker:
+
+1. Ensure the container has sufficient shared memory:
+
+   ```bash
+   docker-compose -f docker-compose.dev.yml down
+   docker-compose -f docker-compose.dev.yml up --build
+   ```
+
+2. Check Chrome and ChromeDriver versions match:
+
+   ```bash
+   docker-compose -f docker-compose.dev.yml run api google-chrome --version
+   docker-compose -f docker-compose.dev.yml run api chromedriver --version
+   ```
+
+3. Run the test script to verify Selenium setup:
+   ```bash
+   docker-compose -f docker-compose.dev.yml run api python test_selenium.py
+   ```
 
 ## Contributing
 
