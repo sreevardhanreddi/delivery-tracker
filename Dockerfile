@@ -6,11 +6,9 @@ WORKDIR /code
 
 # Install dependencies
 RUN apt-get update && apt-get install -y
+RUN apt-get install chromium -y
 
 COPY ./requirements.txt /code/requirements.txt
-
-RUN pip install playwright && \
-    playwright install chromium
 
 RUN pip install -r /code/requirements.txt
 

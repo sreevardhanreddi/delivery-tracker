@@ -9,7 +9,7 @@ A comprehensive tracking system that integrates with multiple Indian courier ser
 Currently integrated with major Indian logistics providers:
 
 - Bluedart
-- DTDC (with both API and Playwright-based tracking)
+- DTDC (with both API and Selenium-based tracking)
 - Delhivery
 - ShadowFax
 - Ecom Express
@@ -29,7 +29,7 @@ Currently integrated with major Indian logistics providers:
 - **Database**: SQLModel with SQLite
 - **Task Scheduling**: AsyncIO Scheduler (APScheduler)
 - **Web Scraping**:
-  - Playwright with Chrome for DTDC tracking
+  - Selenium with Chrome for DTDC tracking
   - BeautifulSoup4 for HTML parsing
   - Requests for HTTP calls
 - **Containerization**: Docker with multi-stage builds
@@ -56,8 +56,19 @@ The application uses the following environment variables, which should be define
    ```bash
    pip install -r requirements.txt
    ```
-4. Copy `.env.example` to `.env` and configure your environment variables
-5. Run the application using Docker or directly with FastAPI:
+4. Install Chrome and ChromeDriver:
+
+   ```bash
+   # For Raspberry Pi (Debian/Ubuntu)
+   sudo apt-get update
+   sudo apt-get install -y chromium-browser chromium-chromedriver
+
+   # For other Linux distributions, use your package manager
+   # For Windows/Mac, download Chrome and ChromeDriver manually
+   ```
+
+5. Copy `.env.example` to `.env` and configure your environment variables
+6. Run the application using Docker or directly with FastAPI:
    ```bash
    uvicorn main:app --reload
    ```
@@ -67,12 +78,14 @@ The application uses the following environment variables, which should be define
 ### Start the Application
 
 #### Using Docker
+
 ```bash
 docker-compose -f docker-compose.dev.yml up  # For development
 docker-compose -f docker-compose.prod.yml up  # For production
 ```
 
 #### Using FastAPI directly
+
 ```bash
 uvicorn main:app --reload
 ```
