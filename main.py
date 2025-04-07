@@ -20,13 +20,7 @@ from sqlmodel import Session, select
 from database.connection import create_db_and_tables, get_session
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
-from services.tracker import (
-    delhivery_track,
-    dtdc_track,
-    dtdc_track_selenium,
-    shadow_fax_track,
-    track_all,
-)
+from services.tracker import track_all
 from tasks.tracker import update_packages_status
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))

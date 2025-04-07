@@ -1,3 +1,4 @@
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 
@@ -5,7 +6,7 @@ import bs4
 import requests
 from loguru import logger
 
-from services.selenium_tracker import dtdc_track_selenium_srv
+from services.selenium_tracker import dtdc_track_srv
 from utils.common import parse_date_time_string
 
 REQUEST_TIMEOUT = 120
@@ -136,32 +137,21 @@ def dtdc_track(num: str) -> dict:
     return status
 
 
-def dtdc_track_selenium(num: str) -> dict:
+def dtdc_track_by_browser(num: str) -> dict:
     status = {"events": None, "service": None}
     try:
-        html_response = dtdc_track_selenium_srv(num)
-        soup = bs4.BeautifulSoup(html_response, "html.parser")
-        # Find relevant sections for location and datetime details
-        timeline_steps = soup.find_all("div", class_="timeline-step")
-        timeline_steps = timeline_steps[0 : len(timeline_steps) // 2]
+        response_text = dtdc_track_srv(num)
+        try:
+            response_text = json.loads(response_text)
+        except Exception as e:
+            logger.error(error=f"Error parsing JSON: {e}")
+
+        timeline_steps = response_text.get("milestones", [])
         location_details = []
         for item in timeline_steps:
-            # Extract details
-            details = item.find("p", class_="h6 milestone_title text-dark")
-            if details:
-                details = details.get_text(strip=True)
-
-            # Extract location and datetime
-            location_and_datetime = (
-                item.find("p", class_="h6 text-muted mb-1 mb-lg-3")
-                .decode_contents()
-                .split("<br/>")
-            )
-
-            if len(location_and_datetime) != 2:
-                continue
-            location = location_and_datetime[0].strip()
-            datetime_text = location_and_datetime[1].strip()
+            details = item.get("event", "")
+            location = item.get("location", "")
+            datetime_text = item.get("timestamp", "")
 
             parsed_datetime = None
             # Parse datetime
@@ -184,7 +174,7 @@ def dtdc_track_selenium(num: str) -> dict:
         status["service"] = "dtdc"
 
     except Exception as e:
-        logger.error(f"An error occurred fetching from dtdc: {e}")
+        logger.error("An error occurred fetching from dtdc", e)
     return status
 
 
@@ -354,7 +344,7 @@ def track_all(num: str) -> dict:
     tasks = [
         bd_track,
         # dtdc_track,
-        dtdc_track_selenium,
+        dtdc_track_by_browser,
         ecom_express_track,
         delhivery_track,
         shadow_fax_track,

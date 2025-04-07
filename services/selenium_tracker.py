@@ -2,114 +2,50 @@ import sys
 import time
 
 from loguru import logger
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from playwright.sync_api import sync_playwright
 
 
-def get_driver():
-    """Setup Chrome driver with necessary options"""
-    chrome_options = Options()
-    # chrome_options.add_argument("--headless")  # Run in headless mode (optional)
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument(
-        "--ignore-certificate-errors"
-    )  # Disable certificate errors
-    chrome_options.add_argument("--auto-open-devtools-for-tabs")
-    chrome_options.add_argument(
-        "--disable-third-party-cookies"
-    )  # This is deprecated and unreliable
+def dtdc_track_srv(tracking_number: str):
+    link = "https://www.dtdc.in/trace.asp"
 
-    # If running in Docker, you might need to add these options
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
+    query = "given the tracking number {}, provide a json response you receive directly, no yapping, thank you".format(
+        tracking_number
+    )
+    with sync_playwright() as p:
+        logger.info("Launching browser...")
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-    service = Service()
-    if sys.platform == "linux":
-        chrome_options.add_argument("--headless")  # Run in headless mode (optional)
-        service = Service("/usr/local/bin/chromedriver")
-        chrome_options.binary_location = "/opt/chrome/chrome"
+        page.goto(link, wait_until="load")
 
-    return webdriver.Chrome(service=service, options=chrome_options)
+        # click on the chatbot icon and wait for it to appear
+        chatbot_icon = page.locator("#small-chat")
+        chatbot_icon.click()
 
+        # Wait for the iframe to be available and switch to it
+        iframe = page.frame_locator("iframe#the_iframe")
+        # iframe.wait_for_selector(".chat-input", state="visible")
 
-def test_selenium():
-    driver = get_driver()
-    driver.get("https://www.google.com")
-    time.sleep(5)
-    driver.quit()
+        # Now interact with elements inside the iframe
+        logger.info("Waiting for iframe to load...")
+        text_area = iframe.locator(".chat-input")
+        text_area.fill(query)
 
+        # Press Enter to send the message
+        logger.info("Sending message...")
+        text_area.press("Enter")
 
-def dtdc_track_selenium_srv(tracking_number: str):
-    driver = get_driver()
+        # Wait for all network requests to become idle
+        logger.info("Waiting for network idle...")
+        page.wait_for_load_state("networkidle", timeout=30000)
 
-    try:
-        # Wait for the form to load
-        wait = WebDriverWait(driver, 10)
+        # Wait a bit more to ensure the response is fully loaded
+        page.wait_for_timeout(1000)
 
-        logger.info("Fetching dtdc.in")
-        driver.get("https://dtdc.in/trace.asp")
-        logger.info("Loaded dtdc.in")
-        logger.info("add tracking number")
-        driver.find_element(By.ID, "trackingNumber").send_keys(tracking_number)
+        bot_responses = iframe.locator(".bot-block")
+        last_bot_response = bot_responses.last
+        bot_response_text = last_bot_response.inner_text()
+        logger.info("Bot response: {}".format(bot_response_text))
 
-        # Switch to captcha iframe (adjust frame name/ID as needed)
-        logger.info("Waiting for captcha iframe")
-        captcha_iframe = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[name^='a-']"))
-        )
-        driver.switch_to.frame(captcha_iframe)
-
-        # Click the captcha checkbox
-        captcha_checkbox = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, ".recaptcha-checkbox-border"))
-        )
-        captcha_checkbox.click()
-        logger.info("Clicked captcha checkbox")
-
-        logger.info("Waiting for captcha to be solved for 5 seconds")
-        time.sleep(5)
-        # close any alerts
-        try:
-            logger.info("Closing any alerts")
-            alert = driver.switch_to.alert
-            alert.accept()
-        except:
-            pass
-
-        logger.info("Switching back to default content")
-        # Switch back to default content
-        driver.switch_to.default_content()
-
-        # Click the submit button
-        submit_button = wait.until(
-            EC.element_to_be_clickable(
-                (
-                    By.CSS_SELECTOR,
-                    "#trackingHomeForm > div > div > div.row.pt-2.justify-content-between > div > div > div.form-group > input",
-                )
-            )
-        )
-        submit_button.click()
-        logger.info("Clicked submit button")
-
-        logger.info("Waiting for results to load")
-        # Wait a moment for captcha verification
-        time.sleep(5)
-
-        # Get the page source
-        page_source = driver.page_source
-        return page_source
-
-    except Exception as e:
-        logger.error(f"An error occurred fetching from dtdc.in : {e}")
-
-    finally:
-        driver.quit()
-
-    return ""
+        browser.close()
+        return bot_response_text
