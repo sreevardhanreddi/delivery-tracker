@@ -14,7 +14,10 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from database.connection import create_db_and_tables, get_session
@@ -35,20 +38,19 @@ scheduler.add_job(
     seconds=SLEEP_INTERVAL,
 )
 
-app = FastAPI()
-
-
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
 
+app = FastAPI(title="Indian Courier Tracking API", lifespan=lifespan)
+
+# Set up templates and static files
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logging.basicConfig(level=logging.INFO)
-
-app = FastAPI(title="Indian Courier Tracking API")
-
 
 @app.on_event("startup")
 async def on_startup():
@@ -61,7 +63,12 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/track")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/track")
 def list_packages(
     session: Session = Depends(get_session), offset: int = 0, limit: int = 10
 ):
@@ -69,7 +76,7 @@ def list_packages(
     return packages
 
 
-@app.post("/track", response_model=TrackPackage)
+@app.post("/api/track", response_model=TrackPackage)
 async def create_package(
     package: CreatePackage,
     session: Session = Depends(get_session),
@@ -106,7 +113,7 @@ async def create_package(
     return package_obj
 
 
-@app.delete("/track/{num}")
+@app.delete("/api/track/{num}")
 def delete_package(num: str, session: Session = Depends(get_session)):
     package = session.exec(
         select(TrackPackage).where(TrackPackage.number == num)
@@ -117,4 +124,4 @@ def delete_package(num: str, session: Session = Depends(get_session)):
     else:
         session.delete(package)
         session.commit()
-    return {"message": "Package deleted"}
+    return {"success": True, "message": "Package deleted"}

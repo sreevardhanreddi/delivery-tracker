@@ -43,12 +43,12 @@ def bd_track(num: str) -> dict:
             timeout=REQUEST_TIMEOUT,
         )
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from bluedart")
             return status
         soup = bs4.BeautifulSoup(res.text, "html.parser")
         status_events = soup.find("div", id="SCAN{}".format(num))
         if status_events is None:
-            logger.error("Error in fetching the status")
+            logger.error("Error fetching the status from bluedart")
             return status
 
         # convert the table to a list of dictionaries
@@ -199,7 +199,7 @@ def ecom_express_track(num: str) -> dict:
 
         data = res.json()
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from ecom_express")
             return status
 
         # convert the table to a list of dictionaries
@@ -262,7 +262,7 @@ def delhivery_track(num: str) -> dict:
         data = res.json()
 
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from delhivery")
             return status
 
         events = []
