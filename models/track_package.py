@@ -18,7 +18,6 @@ class TrackPackage(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-
 class CreatePackage(BaseModel):
     number: str
     description: str

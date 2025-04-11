@@ -12,7 +12,7 @@ async def update_package_tracking(package_id: int, tracking_number: str):
     """Update package tracking information in the background."""
     # Run the synchronous track_all function in a separate thread
     status = await asyncify(track_all)(tracking_number)
-    
+
     with Session(engine) as session:
         package = session.get(TrackPackage, package_id)
         if not package:
@@ -35,4 +35,4 @@ async def update_package_tracking(package_id: int, tracking_number: str):
 
         await send_message(
             f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
-        ) 
+        )

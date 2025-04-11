@@ -14,18 +14,18 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, BackgroundTasks
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
-from database.connection import create_db_and_tables, get_session, engine
+from database.connection import create_db_and_tables, engine, get_session
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
 from services.tracker import track_all
-from tasks.tracker import update_packages_status
 from services.tracking_service import update_package_tracking
+from tasks.tracker import update_packages_status
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
 
@@ -37,8 +37,9 @@ scheduler.add_job(
     "interval",
     seconds=SLEEP_INTERVAL,
     id="update_packages",
-    replace_existing=True
+    replace_existing=True,
 )
+
 
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI):
     # Shutdown the scheduler when the app stops
     scheduler.shutdown()
 
+
 app = FastAPI(title="Indian Courier Tracking API", lifespan=lifespan)
 
 # Set up templates and static files
@@ -57,7 +59,6 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logging.basicConfig(level=logging.INFO)
-
 
 
 @app.get("/health")
@@ -103,7 +104,7 @@ async def create_package(
 
     # Add the tracking task to background tasks
     background_tasks.add_task(update_package_tracking, package_obj.id, package.number)
-    
+
     return package_obj
 
 
