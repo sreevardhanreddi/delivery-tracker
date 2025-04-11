@@ -31,18 +31,23 @@ SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
 
 # Set up the scheduler
 scheduler = AsyncIOScheduler()
-# every 1 minute
-trigger = CronTrigger.from_crontab("*/1 * * * *")
+# Add the job with proper configuration
 scheduler.add_job(
     update_packages_status,
     "interval",
     seconds=SLEEP_INTERVAL,
+    id="update_packages",
+    replace_existing=True
 )
 
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    # Start the scheduler when the app starts
+    scheduler.start()
     yield
+    # Shutdown the scheduler when the app stops
     scheduler.shutdown()
 
 app = FastAPI(title="Indian Courier Tracking API", lifespan=lifespan)
@@ -53,10 +58,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logging.basicConfig(level=logging.INFO)
 
-@app.on_event("startup")
-async def on_startup():
-    create_db_and_tables()
-    scheduler.start()
 
 
 @app.get("/health")
