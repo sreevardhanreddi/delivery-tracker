@@ -94,7 +94,7 @@
     <!-- Package list -->
     <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 transition-colors duration-200">
       <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-dark-text">Tracked Packages</h2>
-      <div id="package-list" hx-get="/api/track" hx-trigger="load, every 16s">
+      <div id="package-list">
         <!-- Packages will be loaded here -->
       </div>
     </div>
@@ -162,6 +162,24 @@
   </template>
 
   <script>
+    // Initial load of packages
+    refreshPackageList();
+
+    // Set up periodic refresh
+    setInterval(refreshPackageList, 16000);
+
+    // Function to refresh the package list
+    function refreshPackageList() {
+      fetch('/api/track')
+        .then(response => response.json())
+        .then(packages => {
+          formatPackages(packages);
+        })
+        .catch(error => {
+          console.error('Error refreshing package list:', error);
+        });
+    }
+
     // Add this at the beginning of your script section
     // Handle form submission with JSON data
     document.getElementById('add-package-form').addEventListener('submit', function (e) {
@@ -190,14 +208,8 @@
         .then(data => {
           // Clear the form
           this.reset();
-
-          // Refetch and update the package list
-          return fetch('/api/track');
-        })
-        .then(response => response.json())
-        .then(packages => {
-          // Update the UI with the new package list
-          formatPackages(packages);
+          // Refresh the package list
+          refreshPackageList();
         })
         .catch(error => {
           console.error('Error adding package:', error);
@@ -288,9 +300,6 @@
         container.appendChild(clone);
       });
 
-      // Process the newly added elements with HTMX
-      htmx.process(container);
-
       // Set up accordion functionality
       setupAccordions();
 
@@ -337,12 +346,8 @@
                 if (!response.ok) {
                   throw new Error('Failed to delete package');
                 }
-                // Refetch the package list
-                return fetch('/api/track');
-              })
-              .then(response => response.json())
-              .then(packages => {
-                formatPackages(packages);
+                // Refresh the package list
+                refreshPackageList();
               })
               .catch(error => {
                 console.error('Error:', error);
@@ -352,26 +357,6 @@
         });
       });
     }
-
-    // Listen for HTMX after swap event
-    document.body.addEventListener('htmx:afterSwap', function (evt) {
-      if (evt.detail.target.id === 'package-list' && evt.detail.xhr.getResponseHeader('Content-Type').includes('application/json')) {
-        try {
-          const packages = JSON.parse(evt.detail.xhr.responseText);
-          formatPackages(packages);
-        } catch (e) {
-          console.error('Error parsing package data:', e);
-        }
-      }
-    });
-
-    // Listen for HTMX after request event to refresh the list after deletion
-    document.body.addEventListener('htmx:afterRequest', function (evt) {
-      if (evt.detail.elt.hasAttribute('hx-delete') && evt.detail.successful) {
-        // Trigger a refresh of the package list
-        htmx.trigger('#package-list', 'load');
-      }
-    });
   </script>
 </body>
 
