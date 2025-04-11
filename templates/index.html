@@ -41,9 +41,42 @@
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <!-- Courier logos configuration -->
   <script src="/static/js/courier-logos.js"></script>
+  <style>
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background-color: #f3f4f6;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .progress-bar.visible {
+      opacity: 1;
+    }
+
+    .progress-bar .progress {
+      height: 100%;
+      background-color: #4f46e5;
+      width: 0%;
+      transition: width 0.3s ease-in-out;
+    }
+
+    .progress-bar .progress.complete {
+      width: 100%;
+    }
+  </style>
 </head>
 
 <body class="bg-gray-100 dark:bg-dark-bg min-h-screen transition-colors duration-200">
+  <!-- Progress Bar -->
+  <div class="progress-bar">
+    <div class="progress"></div>
+  </div>
+
   <div class="container mx-auto px-4 py-8">
     <header class="mb-8 flex justify-between items-center">
       <div>
@@ -162,6 +195,29 @@
   </template>
 
   <script>
+    // Progress bar management
+    const progressBar = document.querySelector('.progress-bar');
+    const progress = progressBar.querySelector('.progress');
+    let requestCount = 0;
+
+    function showProgress() {
+      requestCount++;
+      progressBar.classList.add('visible');
+      progress.style.width = '96%';
+    }
+
+    function completeProgress() {
+      requestCount--;
+      if (requestCount <= 0) {
+        progress.classList.add('complete');
+        setTimeout(() => {
+          progressBar.classList.remove('visible');
+          progress.classList.remove('complete');
+          progress.style.width = '0%';
+        }, 300);
+      }
+    }
+
     // Initial load of packages
     refreshPackageList();
 
@@ -170,6 +226,7 @@
 
     // Function to refresh the package list
     function refreshPackageList() {
+      showProgress();
       fetch('/api/track')
         .then(response => response.json())
         .then(packages => {
@@ -177,6 +234,9 @@
         })
         .catch(error => {
           console.error('Error refreshing package list:', error);
+        })
+        .finally(() => {
+          completeProgress();
         });
     }
 
@@ -196,6 +256,7 @@
       const originalText = submitButton.textContent;
       submitButton.disabled = true;
       submitButton.textContent = 'Adding...';
+      showProgress();
 
       fetch('/api/track', {
         method: 'POST',
@@ -219,6 +280,7 @@
           // Reset button state
           submitButton.disabled = false;
           submitButton.textContent = originalText;
+          completeProgress();
         });
     });
 
@@ -334,6 +396,7 @@
 
           if (confirm('Are you sure you want to delete this package?')) {
             const trackingNumber = this.dataset.trackingNumber;
+            showProgress();
 
             // Make a DELETE request to the API
             fetch(`/api/track/${trackingNumber}`, {
@@ -352,6 +415,9 @@
               .catch(error => {
                 console.error('Error:', error);
                 alert('Failed to delete package. Please try again.');
+              })
+              .finally(() => {
+                completeProgress();
               });
           }
         });
