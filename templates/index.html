@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ 
+  darkMode: localStorage.getItem('darkMode') !== null 
+    ? localStorage.getItem('darkMode') === 'true' 
+    : window.matchMedia('(prefers-color-scheme: dark)').matches 
+  }" x-init="
+    $watch('darkMode', val => localStorage.setItem('darkMode', val));
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      if (localStorage.getItem('darkMode') === null) {
+        darkMode = e.matches;
+      }
+    });
+  " :class="{ 'dark': darkMode }">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indian Courier Tracking Hub</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/jpeg" href="/static/images/favicon.jpg">
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: {
+              bg: '#1a1a1a',
+              card: '#2d2d2d',
+              text: '#e5e5e5',
+              border: '#404040'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- HTMX for dynamic content loading -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <!-- Alpine.js for additional interactivity -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Courier logos configuration -->
+  <script src="/static/js/courier-logos.js"></script>
+  <style>
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background-color: #f3f4f6;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .progress-bar.visible {
+      opacity: 1;
+    }
+
+    .progress-bar .progress {
+      height: 100%;
+      background-color: #4f46e5;
+      width: 0%;
+      transition: width 0.3s ease-in-out;
+    }
+
+    .progress-bar .progress.complete {
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 dark:bg-dark-bg min-h-screen transition-colors duration-200">
+  <!-- Progress Bar -->
+  <div class="progress-bar">
+    <div class="progress"></div>
+  </div>
+
+  <div class="container mx-auto px-4 py-8">
+    <header class="mb-8 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-dark-text">Indian Courier Tracking Hub</h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-2">Track your packages across multiple courier services</p>
+      </div>
+      <!-- Theme Switcher -->
+      <button @click="darkMode = !darkMode"
+        class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200">
+        <!-- Sun icon -->
+        <svg x-show="!darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800" fill="none"
+          viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <!-- Moon icon -->
+        <svg x-show="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-200" fill="none"
+          viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- Add new package form -->
+    <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 mb-8 transition-colors duration-200">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-dark-text">Add New Package</h2>
+      <form id="add-package-form" class="space-y-4">
+        <div>
+          <label for="tracking_number" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tracking
+            Number</label>
+          <input type="text" id="tracking_number" name="number" required
+            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Supported courier services: BlueDart, DTDC, ECOM
+            Express, Delhivery, and ShadowFax.</p>
+        </div>
+        <div>
+          <label for="description"
+            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+          <textarea id="description" name="description" rows="3" required
+            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+        </div>
+        <button type="submit"
+          class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800">
+          Add Package
+        </button>
+      </form>
+    </div>
+
+    <!-- Package list -->
+    <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 transition-colors duration-200">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-dark-text">Tracked Packages</h2>
+      <div id="package-list">
+        <!-- Packages will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Package item template -->
+  <template id="package-template">
+    <div class="border-b border-gray-200 dark:border-dark-border py-4 last:border-b-0">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-dark-text tracking-number"></h3>
+            <div class="service-chip flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full">
+              <img class="h-4 w-4" src="" alt="" />
+              <span></span>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500 dark:text-gray-400 description"></p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 status"></p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <!-- Accordion toggle button -->
+          <button
+            class="accordion-toggle text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform transition-transform duration-200"
+              viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clip-rule="evenodd" />
+            </svg>
+          </button>
+          <!-- Delete button -->
+          <a href="#" class="delete-package text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clip-rule="evenodd" />
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Events table (collapsible) -->
+      <div class="accordion-content mt-4 overflow-x-auto hidden">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+          <thead class="bg-gray-50 dark:bg-gray-800">
+            <tr>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Details</th>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Location</th>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Date</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-dark-border events-table">
+            <!-- Events will be loaded here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // Progress bar management
+    const progressBar = document.querySelector('.progress-bar');
+    const progress = progressBar.querySelector('.progress');
+    let requestCount = 0;
+
+    function showProgress() {
+      requestCount++;
+      progressBar.classList.add('visible');
+      progress.style.width = '96%';
+    }
+
+    function completeProgress() {
+      requestCount--;
+      if (requestCount <= 0) {
+        progress.classList.add('complete');
+        setTimeout(() => {
+          progressBar.classList.remove('visible');
+          progress.classList.remove('complete');
+          progress.style.width = '0%';
+        }, 300);
+      }
+    }
+
+    // Initial load of packages
+    refreshPackageList();
+
+    // Set up periodic refresh
+    setInterval(refreshPackageList, 16000);
+
+    // Function to refresh the package list
+    function refreshPackageList() {
+      showProgress();
+      fetch('/api/track')
+        .then(response => response.json())
+        .then(packages => {
+          formatPackages(packages);
+        })
+        .catch(error => {
+          console.error('Error refreshing package list:', error);
+        })
+        .finally(() => {
+          completeProgress();
+        });
+    }
+
+    // Add this at the beginning of your script section
+    // Handle form submission with JSON data
+    document.getElementById('add-package-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const jsonData = {};
+      for (let [key, value] of formData.entries()) {
+        jsonData[key] = value;
+      }
+
+      // Show loading state
+      const submitButton = this.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.disabled = true;
+      submitButton.textContent = 'Adding...';
+      showProgress();
+
+      fetch('/api/track', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(jsonData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          // Clear the form
+          this.reset();
+          // Refresh the package list
+          refreshPackageList();
+        })
+        .catch(error => {
+          console.error('Error adding package:', error);
+          alert('Failed to add package. Please try again.');
+        })
+        .finally(() => {
+          // Reset button state
+          submitButton.disabled = false;
+          submitButton.textContent = originalText;
+          completeProgress();
+        });
+    });
+
+    // Function to format the package list
+    function formatPackages(packages) {
+      const container = document.getElementById('package-list');
+      container.innerHTML = '';
+
+      if (packages.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No packages tracked yet.</p>';
+        return;
+      }
+
+      const template = document.getElementById('package-template');
+
+      packages.forEach(pkg => {
+        const clone = template.content.cloneNode(true);
+
+        // Set tracking number
+        clone.querySelector('.tracking-number').textContent = pkg.number;
+
+        // Set service chip
+        const serviceChip = clone.querySelector('.service-chip');
+        const service = getCourierService(pkg.service);
+        const serviceImage = serviceChip.querySelector('img');
+        const serviceName = serviceChip.querySelector('span');
+
+        serviceImage.src = service.logo;
+        serviceImage.alt = service.alt;
+        serviceName.textContent = service.name;
+        serviceChip.classList.add(service.color, 'text-white');
+
+        // Set description
+        clone.querySelector('.description').textContent = pkg.description || 'No description';
+
+        // Set status
+        const statusElement = clone.querySelector('.status');
+        if (pkg.status) {
+          statusElement.textContent = `Status: ${pkg.status}`;
+          statusElement.classList.add('text-green-600', 'dark:text-green-400');
+        } else {
+          statusElement.textContent = 'Status: Pending';
+          statusElement.classList.add('text-yellow-600', 'dark:text-yellow-400');
+        }
+
+        // Update delete button href
+        const deleteButton = clone.querySelector('.delete-package');
+        deleteButton.dataset.trackingNumber = pkg.number;
+
+        // Parse and display events
+        const eventsTable = clone.querySelector('.events-table');
+        if (pkg.events) {
+          try {
+            const events = JSON.parse(pkg.events);
+            if (events.length > 0) {
+              // Sort events by date_time in descending order (newest first)
+              events.sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+
+              events.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
+                `;
+                eventsTable.appendChild(row);
+              });
+            } else {
+              eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">No tracking events available</td></tr>';
+            }
+          } catch (e) {
+            console.error('Error parsing events:', e);
+            eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Error parsing tracking events</td></tr>';
+          }
+        } else {
+          eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">No tracking events available</td></tr>';
+        }
+
+        container.appendChild(clone);
+      });
+
+      // Set up accordion functionality
+      setupAccordions();
+
+      // Set up delete button functionality
+      setupDeleteButtons();
+    }
+
+    // Function to set up accordion functionality
+    function setupAccordions() {
+      document.querySelectorAll('.accordion-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function () {
+          const content = this.closest('.border-b').querySelector('.accordion-content');
+          const icon = this.querySelector('svg');
+
+          // Toggle the content visibility
+          if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+          } else {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-180');
+          }
+        });
+      });
+    }
+
+    // Function to set up delete button functionality
+    function setupDeleteButtons() {
+      document.querySelectorAll('.delete-package').forEach(button => {
+        button.addEventListener('click', function (e) {
+          e.preventDefault();
+
+          if (confirm('Are you sure you want to delete this package?')) {
+            const trackingNumber = this.dataset.trackingNumber;
+            showProgress();
+
+            // Make a DELETE request to the API
+            fetch(`/api/track/${trackingNumber}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error('Failed to delete package');
+                }
+                // Refresh the package list
+                refreshPackageList();
+              })
+              .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete package. Please try again.');
+              })
+              .finally(() => {
+                completeProgress();
+              });
+          }
+        });
+      });
+    }
+  </script>
+</body>
+
+</html>

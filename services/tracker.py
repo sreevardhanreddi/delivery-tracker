@@ -43,12 +43,12 @@ def bd_track(num: str) -> dict:
             timeout=REQUEST_TIMEOUT,
         )
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from bluedart")
             return status
         soup = bs4.BeautifulSoup(res.text, "html.parser")
         status_events = soup.find("div", id="SCAN{}".format(num))
         if status_events is None:
-            logger.error("Error in fetching the status")
+            logger.error("Error fetching the status from bluedart")
             return status
 
         # convert the table to a list of dictionaries
@@ -151,20 +151,16 @@ def dtdc_track_by_browser(num: str) -> dict:
         for item in timeline_steps:
             details = item.get("event", "")
             location = item.get("location", "")
-            datetime_text = item.get("timestamp", "")
+            datetime_text = item.get("date", "")
 
             parsed_datetime = None
             # Parse datetime
             if datetime_text:
-                date_string = re.sub(
-                    r"(\d)(st|nd|rd|th)", r"\1", datetime_text
-                )  # remove ordinal suffix
-                date_string = date_string.replace("@", "")  # remove '@' symbol
-                parsed_datetime = parse_date_time_string(date_string)
+                parsed_datetime = parse_date_time_string(datetime_text)
 
             parsed_data = {
                 "location": location,
-                "datetime": parsed_datetime,
+                "date_time": parsed_datetime,
                 "details": details,
             }
             location_details.append(parsed_data)
@@ -199,7 +195,7 @@ def ecom_express_track(num: str) -> dict:
 
         data = res.json()
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from ecom_express")
             return status
 
         # convert the table to a list of dictionaries
@@ -262,7 +258,7 @@ def delhivery_track(num: str) -> dict:
         data = res.json()
 
         if res.status_code != 200:
-            logger.error("Error in fetching the page")
+            logger.error("Error fetching from delhivery")
             return status
 
         events = []

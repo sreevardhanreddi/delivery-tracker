@@ -14,46 +14,51 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
-from database.connection import create_db_and_tables, get_session
+from database.connection import create_db_and_tables, engine, get_session
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
 from services.tracker import track_all
+from services.tracking_service import update_package_tracking
 from tasks.tracker import update_packages_status
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
 
 # Set up the scheduler
 scheduler = AsyncIOScheduler()
-# every 1 minute
-trigger = CronTrigger.from_crontab("*/1 * * * *")
+# Add the job with proper configuration
 scheduler.add_job(
     update_packages_status,
     "interval",
     seconds=SLEEP_INTERVAL,
+    id="update_packages",
+    replace_existing=True,
 )
-
-app = FastAPI()
 
 
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    # Start the scheduler when the app starts
+    scheduler.start()
     yield
+    # Shutdown the scheduler when the app stops
     scheduler.shutdown()
 
 
+app = FastAPI(title="Indian Courier Tracking API", lifespan=lifespan)
+
+# Set up templates and static files
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 logging.basicConfig(level=logging.INFO)
-
-app = FastAPI(title="Indian Courier Tracking API")
-
-
-@app.on_event("startup")
-async def on_startup():
-    create_db_and_tables()
-    scheduler.start()
 
 
 @app.get("/health")
@@ -61,7 +66,12 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/track")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/track")
 def list_packages(
     session: Session = Depends(get_session), offset: int = 0, limit: int = 10
 ):
@@ -69,44 +79,36 @@ def list_packages(
     return packages
 
 
-@app.post("/track", response_model=TrackPackage)
+@app.post("/api/track", response_model=TrackPackage)
 async def create_package(
     package: CreatePackage,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-
     if session.exec(
         select(TrackPackage).where(TrackPackage.number == package.number)
     ).first():
         raise HTTPException(status_code=400, detail="Package already exists")
 
-    status = track_all(package.number)
-    events = status.get("events", None)
-
-    if events is None:
-        raise HTTPException(status_code=404, detail="Package not found")
-
-    json_events = ""
-    if status:
-        json_events = json_dumps(events)
+    # Create a temporary package object
     package_obj = TrackPackage(
         number=package.number,
-        service=status.get("service", ""),
+        service="",
         description=package.description,
-        events=json_events,
-        status=events[0]["details"],
+        events="[]",
+        status="Tracking in progress...",
     )
     session.add(package_obj)
     session.commit()
     session.refresh(package_obj)
 
-    await send_message(
-        f"Package {package_obj.number} {package_obj.service} {package_obj.description} updated to {dict_to_str(events[0])}"
-    )
+    # Add the tracking task to background tasks
+    background_tasks.add_task(update_package_tracking, package_obj.id, package.number)
+
     return package_obj
 
 
-@app.delete("/track/{num}")
+@app.delete("/api/track/{num}")
 def delete_package(num: str, session: Session = Depends(get_session)):
     package = session.exec(
         select(TrackPackage).where(TrackPackage.number == num)
@@ -117,4 +119,4 @@ def delete_package(num: str, session: Session = Depends(get_session)):
     else:
         session.delete(package)
         session.commit()
-    return {"message": "Package deleted"}
+    return {"success": True, "message": "Package deleted"}
