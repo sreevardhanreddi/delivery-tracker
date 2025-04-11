@@ -14,17 +14,18 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
-from database.connection import create_db_and_tables, get_session
+from database.connection import create_db_and_tables, get_session, engine
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
 from services.tracker import track_all
 from tasks.tracker import update_packages_status
+from services.tracking_service import update_package_tracking
 
 SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
 
@@ -79,37 +80,29 @@ def list_packages(
 @app.post("/api/track", response_model=TrackPackage)
 async def create_package(
     package: CreatePackage,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-
     if session.exec(
         select(TrackPackage).where(TrackPackage.number == package.number)
     ).first():
         raise HTTPException(status_code=400, detail="Package already exists")
 
-    status = track_all(package.number)
-    events = status.get("events", None)
-
-    if events is None:
-        raise HTTPException(status_code=404, detail="Package not found")
-
-    json_events = ""
-    if status:
-        json_events = json_dumps(events)
+    # Create a temporary package object
     package_obj = TrackPackage(
         number=package.number,
-        service=status.get("service", ""),
+        service="",
         description=package.description,
-        events=json_events,
-        status=events[0]["details"],
+        events="[]",
+        status="Tracking in progress...",
     )
     session.add(package_obj)
     session.commit()
     session.refresh(package_obj)
 
-    await send_message(
-        f"Package {package_obj.number} {package_obj.service} {package_obj.description} updated to {dict_to_str(events[0])}"
-    )
+    # Add the tracking task to background tasks
+    background_tasks.add_task(update_package_tracking, package_obj.id, package.number)
+    
     return package_obj
 
 

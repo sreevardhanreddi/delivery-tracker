@@ -94,7 +94,7 @@
     <!-- Package list -->
     <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 transition-colors duration-200">
       <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-dark-text">Tracked Packages</h2>
-      <div id="package-list" hx-get="/api/track" hx-trigger="load, every 30s">
+      <div id="package-list" hx-get="/api/track" hx-trigger="load, every 16s">
         <!-- Packages will be loaded here -->
       </div>
     </div>
@@ -144,13 +144,13 @@
             <tr>
               <th scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Date & Time</th>
+                Details</th>
               <th scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Location</th>
               <th scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Details</th>
+                Date</th>
             </tr>
           </thead>
           <tbody class="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-dark-border events-table">
@@ -173,6 +173,12 @@
         jsonData[key] = value;
       }
 
+      // Show loading state
+      const submitButton = this.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.disabled = true;
+      submitButton.textContent = 'Adding...';
+
       fetch('/api/track', {
         method: 'POST',
         headers: {
@@ -182,13 +188,25 @@
       })
         .then(response => response.json())
         .then(data => {
-          // Refresh the package list
-          htmx.trigger('#package-list', 'load');
           // Clear the form
           this.reset();
+
+          // Refetch and update the package list
+          return fetch('/api/track');
+        })
+        .then(response => response.json())
+        .then(packages => {
+          // Update the UI with the new package list
+          formatPackages(packages);
         })
         .catch(error => {
           console.error('Error adding package:', error);
+          alert('Failed to add package. Please try again.');
+        })
+        .finally(() => {
+          // Reset button state
+          submitButton.disabled = false;
+          submitButton.textContent = originalText;
         });
     });
 
@@ -250,9 +268,9 @@
               events.forEach(event => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
                 `;
                 eventsTable.appendChild(row);
               });
