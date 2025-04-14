@@ -363,6 +363,7 @@ def ekart_track(num: str) -> dict:
                 }
             )
 
+        events.reverse()
         status["events"] = events
         status["service"] = "ekart"
     except Exception as e:
