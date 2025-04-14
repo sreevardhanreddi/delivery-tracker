@@ -76,7 +76,10 @@ def list_packages(
     session: Session = Depends(get_session), offset: int = 0, limit: int = 100
 ):
     packages = session.exec(
-        select(TrackPackage).order_by(TrackPackage.created_at.desc()).offset(offset).limit(limit)
+        select(TrackPackage)
+        .order_by(TrackPackage.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     ).all()
     return packages
 

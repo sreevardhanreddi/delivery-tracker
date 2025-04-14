@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from database.connection import engine
 from models.track_package import TrackPackage
 from services.telegram import send_message
-from services.tracker import bd_track, track_all
+from services.tracker import bd_track, track_all, track_by_service
 from utils.common import dict_to_str, json_dumps
 
 
@@ -18,7 +18,7 @@ async def update_packages_status():
             select(TrackPackage).where(TrackPackage.status != "Delivered")
         ).all()
         for package in packages:
-            status = track_all(package.number)
+            status = track_by_service(package.number, package.service)
             events = status.get("events", None)
             if events is None:
                 continue
