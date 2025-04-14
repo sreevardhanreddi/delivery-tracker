@@ -30,6 +30,12 @@ const courierLogos = {
         logo: '/static/images/logos/ecomexpress.png',
         alt: 'Ecom Express Logo'
     },
+    ekart: {
+        name: 'Ekart',
+        color: 'bg-red-500',
+        logo: '/static/images/logos/ekart.png',
+        alt: 'Ekart Logo'
+    },
     unknown: {
         name: 'Unknown',
         color: 'bg-gray-500',
@@ -54,6 +60,8 @@ function getCourierService(service) {
         return courierLogos.shadow_fax;
     } else if (service === 'ecom_express') {
         return courierLogos.ecom_express;
+    } else if (service === 'ekart') {
+        return courierLogos.ekart;
     } else {
         return courierLogos.unknown;
     }

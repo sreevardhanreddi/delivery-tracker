@@ -23,6 +23,15 @@ def parse_date_time_string(date_time_string):
         "%Y-%m-%dT%H:%M:%S.%f",  # ISO 8601 Format: 2024-12-05T05:11:40.736000
         "%Y-%m-%dT%H:%M:%S",
     ]
+    # Handle Unix timestamp in milliseconds
+    try:
+        if isinstance(date_time_string, int) or (isinstance(date_time_string, str) and date_time_string.isdigit()):
+            timestamp = int(date_time_string)
+            if len(str(timestamp)) > 10:  # Likely in milliseconds
+                timestamp /= 1000
+            return datetime.fromtimestamp(timestamp)
+    except Exception as e:
+        pass
 
     # Try each format
     for date_format in date_formats:

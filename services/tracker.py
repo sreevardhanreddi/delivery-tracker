@@ -335,6 +335,41 @@ def shadow_fax_track(num: str) -> dict:
     return status
 
 
+def ekart_track(num: str) -> dict:
+    status = {"events": None, "service": None}
+    try:
+        headers = {
+            **get_common_headers(),
+            "origin": "https://www.ekartlogistics.com",
+            "referer": "https://www.ekartlogistics.com",
+        }
+        res = requests.post(
+            "http://www.ekartlogistics.com/ws/getTrackingDetails",
+            json={"trackingId": num},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if res.status_code != 200:
+            logger.error("Error in fetching the data from ekart")
+            return status
+        data = res.json()
+        events = []
+        for item in data.get("shipmentTrackingDetails", []):
+            events.append(
+                {
+                    "location": item.get("city", ""),
+                    "details": item.get("statusDetails", ""),
+                    "date_time": parse_date_time_string(item.get("date", "")),
+                }
+            )
+
+        status["events"] = events
+        status["service"] = "ekart"
+    except Exception as e:
+        logger.error(f"An error occurred fetching from ekart: {e}")
+    return status
+
+
 def track_all(num: str) -> dict:
     status = {"events": None, "service": None}
     tasks = [
@@ -344,6 +379,7 @@ def track_all(num: str) -> dict:
         ecom_express_track,
         delhivery_track,
         shadow_fax_track,
+        ekart_track,
     ]
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         futures = [executor.submit(task, num) for task in tasks]
