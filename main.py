@@ -73,9 +73,14 @@ async def index(request: Request):
 
 @app.get("/api/track")
 def list_packages(
-    session: Session = Depends(get_session), offset: int = 0, limit: int = 10
+    session: Session = Depends(get_session), offset: int = 0, limit: int = 100
 ):
-    packages = session.exec(select(TrackPackage).offset(offset).limit(limit)).all()
+    packages = session.exec(
+        select(TrackPackage)
+        .order_by(TrackPackage.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
     return packages
 
 
@@ -95,7 +100,7 @@ async def create_package(
         number=package.number,
         service="",
         description=package.description,
-        events="[]",
+        events="[{'location': '', 'details': '', 'date_time': ''}]",
         status="Tracking in progress...",
     )
     session.add(package_obj)

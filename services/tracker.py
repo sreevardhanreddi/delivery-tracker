@@ -30,6 +30,7 @@ def get_common_headers():
 
 
 def bd_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with bluedart")
     status = {"events": None, "service": None}
     try:
         headers = {
@@ -138,6 +139,7 @@ def dtdc_track(num: str) -> dict:
 
 
 def dtdc_track_by_browser(num: str) -> dict:
+    logger.info(f"Tracking {num} with dtdc_track_by_browser")
     status = {"events": None, "service": None}
     try:
         response_text = dtdc_track_srv(num)
@@ -175,6 +177,7 @@ def dtdc_track_by_browser(num: str) -> dict:
 
 
 def ecom_express_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with ecom_express_track")
     status = {"events": None, "service": None}
     try:
         json_data = {"awb_field": num}
@@ -232,6 +235,7 @@ def ecom_express_track(num: str) -> dict:
 
 
 def delhivery_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with delhivery_track")
     status = {"events": None, "service": None}
     try:
         headers = {
@@ -293,6 +297,7 @@ def delhivery_track(num: str) -> dict:
 
 
 def shadow_fax_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with shadow_fax_track")
     status = {"events": None, "service": None}
     try:
         headers = {
@@ -336,6 +341,7 @@ def shadow_fax_track(num: str) -> dict:
 
 
 def ekart_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with ekart_track")
     status = {"events": None, "service": None}
     try:
         headers = {
@@ -363,6 +369,7 @@ def ekart_track(num: str) -> dict:
                 }
             )
 
+        events.reverse()
         status["events"] = events
         status["service"] = "ekart"
     except Exception as e:
@@ -370,7 +377,28 @@ def ekart_track(num: str) -> dict:
     return status
 
 
+def track_by_service(num: str, service: str) -> dict:
+    logger.info(f"Tracking {num} with {service}")
+    status = {"events": None, "service": None}
+    if service == "bluedart":
+        return bd_track(num)
+    elif service == "dtdc":
+        return dtdc_track_by_browser(num)
+    elif service == "ecom_express":
+        return ecom_express_track(num)
+    elif service == "delhivery":
+        return delhivery_track(num)
+    elif service == "shadow_fax":
+        return shadow_fax_track(num)
+    elif service == "ekart":
+        return ekart_track(num)
+    else:
+        logger.error(f"Invalid service: {service}")
+        return status
+
+
 def track_all(num: str) -> dict:
+    logger.info(f"Tracking {num} with track_all")
     status = {"events": None, "service": None}
     tasks = [
         bd_track,

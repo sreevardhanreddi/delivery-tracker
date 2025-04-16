@@ -13,6 +13,7 @@ Currently integrated with major Indian logistics providers:
 - Delhivery
 - ShadowFax
 - Ecom Express
+- Ekart
 
 ### Core Functionality
 

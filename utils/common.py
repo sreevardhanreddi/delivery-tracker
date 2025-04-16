@@ -25,7 +25,9 @@ def parse_date_time_string(date_time_string):
     ]
     # Handle Unix timestamp in milliseconds
     try:
-        if isinstance(date_time_string, int) or (isinstance(date_time_string, str) and date_time_string.isdigit()):
+        if isinstance(date_time_string, int) or (
+            isinstance(date_time_string, str) and date_time_string.isdigit()
+        ):
             timestamp = int(date_time_string)
             if len(str(timestamp)) > 10:  # Likely in milliseconds
                 timestamp /= 1000
