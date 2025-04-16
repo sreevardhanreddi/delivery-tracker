@@ -333,6 +333,8 @@
         // Update delete button href
         const deleteButton = clone.querySelector('.delete-package');
         deleteButton.dataset.trackingNumber = pkg.number;
+        deleteButton.dataset.service = pkg.service;
+        deleteButton.dataset.description = pkg.description;
 
         // Parse and display events
         const eventsTable = clone.querySelector('.events-table');
@@ -398,7 +400,7 @@
         button.addEventListener('click', function (e) {
           e.preventDefault();
 
-          if (confirm('Are you sure you want to delete this package?')) {
+          if (confirm(`Are you sure you want to delete this package? ${this.dataset.trackingNumber} ${this.dataset.service} ${this.dataset.description}`)) {
             const trackingNumber = this.dataset.trackingNumber;
             showProgress();
 
