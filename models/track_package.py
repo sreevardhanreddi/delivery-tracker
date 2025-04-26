@@ -3,6 +3,7 @@ from typing import Annotated, Dict, List, Optional
 
 from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
+
 from models.tracking_event import TrackingEvents
 
 
