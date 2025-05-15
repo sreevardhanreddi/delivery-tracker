@@ -103,7 +103,8 @@ def dtdc_track_srv(tracking_number: str):
 
     # Configure Chrome options
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    if os.getenv("CHROME_HEADLESS", None):
+        chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
