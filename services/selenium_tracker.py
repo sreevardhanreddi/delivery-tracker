@@ -121,6 +121,7 @@ def dtdc_track_srv(tracking_number: str):
         "goog:loggingPrefs", {"performance": "ALL", "browser": "ALL"}
     )
 
+    driver = None
     try:
         logger.info("Launching browser...")
 
@@ -186,11 +187,15 @@ def dtdc_track_srv(tracking_number: str):
             bot_response_text = "No response received"
             logger.warning("No bot response found")
 
-        driver.quit()
         return bot_response_text
 
     except Exception as e:
         logger.error(f"Error in DTDC tracking: {str(e)}")
-        if "driver" in locals():
-            driver.quit()
         return None
+    finally:
+        if driver:
+            try:
+                driver.quit()
+                logger.info("Chrome browser closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing Chrome browser: {str(e)}")
