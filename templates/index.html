@@ -237,7 +237,7 @@
           let localPackages = localStorage.getItem('packages');
           if (localPackages) {
             localPackages = JSON.parse(localPackages);
-            if (localPackages !== packages) {
+            if (JSON.stringify(localPackages) !== JSON.stringify(packages)) {
               localStorage.setItem('packages', JSON.stringify(packages));
               formatPackages(packages);
             }
