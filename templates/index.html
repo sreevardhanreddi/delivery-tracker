@@ -234,7 +234,17 @@
       fetch('/api/track')
         .then(response => response.json())
         .then(packages => {
-          formatPackages(packages);
+          let localPackages = localStorage.getItem('packages');
+          if (localPackages) {
+            localPackages = JSON.parse(localPackages);
+            if (localPackages !== packages) {
+              localStorage.setItem('packages', JSON.stringify(packages));
+              formatPackages(packages);
+            }
+          } else {
+            localStorage.setItem('packages', JSON.stringify(packages));
+            formatPackages(packages);
+          }
         })
         .catch(error => {
           console.error('Error refreshing package list:', error);
