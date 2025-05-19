@@ -20,7 +20,7 @@ async def update_packages_status():
         for package in packages:
             status = track_by_service(package.number, package.service)
             events = status.get("events", None)
-            if events is None:
+            if events is None or len(events) == 0:
                 continue
             # logger.info(f"Package {package.number} status: {dict_to_str(events[0])}")
             logger.info(
