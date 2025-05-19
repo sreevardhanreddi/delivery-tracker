@@ -155,6 +155,8 @@ def dtdc_track_by_browser(num: str) -> dict:
             location = item.get("location", "")
             datetime_text = item.get("timestamp", None)
             if datetime_text is None:
+                datetime_text = item.get("date", None)
+            if datetime_text is None:
                 continue
 
             parsed_datetime = None
