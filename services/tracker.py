@@ -153,7 +153,7 @@ def dtdc_track_by_browser(num: str) -> dict:
         for item in timeline_steps:
             details = item.get("event", "")
             location = item.get("location", "")
-            datetime_text = item.get("date", "")
+            datetime_text = item.get("date", "") or item.get("timestamp", "")
 
             parsed_datetime = None
             # Parse datetime
