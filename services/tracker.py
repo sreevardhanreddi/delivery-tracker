@@ -160,6 +160,10 @@ def dtdc_track_by_browser(num: str) -> dict:
             if datetime_text:
                 parsed_datetime = parse_date_time_string(datetime_text)
 
+            if not parsed_datetime:
+                logger.warning(f"skipping entry {item}, unable to parse datetime")
+                continue
+
             parsed_data = {
                 "location": location,
                 "date_time": parsed_datetime,
