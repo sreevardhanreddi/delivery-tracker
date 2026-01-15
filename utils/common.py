@@ -14,6 +14,8 @@ def dict_to_str(d: dict) -> str:
 
 
 def parse_date_time_string(date_time_string):
+    if isinstance(date_time_string, str):
+        date_time_string = date_time_string.strip()
     date_formats = [
         "%a, %d %b'%y %I:%M %p",
         "%Y-%m-%d %H:%M:%S",  # Format: 2024-12-05 11:03:59
@@ -22,6 +24,7 @@ def parse_date_time_string(date_time_string):
         "%d-%m-%Y %H:%M:%S",  # Format: 05-12-2024 11:03:59
         "%Y-%m-%dT%H:%M:%S.%f",  # ISO 8601 Format: 2024-12-05T05:11:40.736000
         "%Y-%m-%dT%H:%M:%S",
+        "%d %B %Y, %A",  # Format: 16 January 2026, Friday
     ]
     # Handle Unix timestamp in milliseconds
     try:

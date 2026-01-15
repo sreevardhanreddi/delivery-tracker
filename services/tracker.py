@@ -1,6 +1,7 @@
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
+from itertools import zip_longest
 
 import bs4
 import requests
@@ -317,26 +318,43 @@ def shadow_fax_track(num: str) -> dict:
             logger.error("Error in fetching the data from shadowfax")
             return status
 
-        data = res.json()
-        tracking_events = data["data"][0]
+        payload = res.json()
+        if payload.get("message") != "Success":
+            logger.error(
+                f"Shadowfax API did not return Success. message={payload.get('message')}"
+            )
+            return status
 
-        sub_tracking_events = tracking_events.get("sub_status", [])
-        # convert the table to a list of dictionaries
+        data_items = payload.get("data") or []
+        if not isinstance(data_items, list) or not data_items:
+            logger.error("Shadowfax API returned empty/malformed data")
+            return status
+
+        tracking_item = data_items[0] or {}
+        sub_statuses = tracking_item.get("sub_status") or []
+        times = tracking_item.get("time") or []
+
+        if not isinstance(sub_statuses, list) or not isinstance(times, list):
+            logger.error("Shadowfax API returned malformed sub_status/time")
+            return status
+
         events = []
-        for i, item in enumerate(sub_tracking_events):
-
-            time = tracking_events["time"][i]
-
-            date_time = parse_date_time_string(time)
+        for details, time_str in zip_longest(sub_statuses, times, fillvalue=None):
+            if not details:
+                continue
+            date_time = parse_date_time_string(time_str) if time_str else None
             events.append(
                 {
-                    # "location": item,
-                    "details": item,
+                    "details": details,
                     "date_time": date_time,
                 }
             )
+
         status["events"] = events
         status["service"] = "shadow_fax"
+        status["eta"] = parse_date_time_string(
+            payload.get("order_details", {}).get("exp_delivery_date", "")
+        )
 
     except Exception as e:
         logger.error(f"An error occurred fetching from shadow fax: {e}")
