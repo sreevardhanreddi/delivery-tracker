@@ -11,7 +11,11 @@ engine = create_engine(sqlite_url, connect_args=connect_args)
 
 
 def create_db_and_tables():
+    from database.migrations import run_migrations
+
     SQLModel.metadata.create_all(engine)
+    # Run migrations to add any missing columns
+    run_migrations(engine)
 
 
 def get_session():
