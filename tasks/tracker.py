@@ -29,6 +29,8 @@ async def update_packages_status():
             if json.loads(json_dumps(events[0])) != json.loads(package.events)[0]:
                 package.events = json_dumps(events)
                 package.status = events[0]["details"]
+                eta = status.get("eta", "")
+                package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
                 session.add(package)
                 session.commit()
                 logger.info(

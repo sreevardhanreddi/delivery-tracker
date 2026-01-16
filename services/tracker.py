@@ -439,5 +439,7 @@ def track_all(num: str) -> dict:
             if events is not None:
                 status["events"] = events
                 status["service"] = res.get("service")
+                status["eta"] = res.get("eta", "")
+                break
 
     return status

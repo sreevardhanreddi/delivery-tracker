@@ -14,6 +14,7 @@ class TrackPackage(SQLModel, table=True):
     service: str = Field(default="")
     description: str = Field(default="")
     events: str = Field(default="[]")  # Stored as JSON string
+    eta: str = Field(default="")
     status: str = Field(default="")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

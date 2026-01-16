@@ -30,9 +30,13 @@ async def update_package_tracking(package_id: int, tracking_number: str):
         package.service = status.get("service", "")
         package.events = json_events
         package.status = events[0]["details"]
+        eta = status.get("eta", "")
+        package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
         session.add(package)
         session.commit()
 
-        await send_message(
-            f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
-        )
+        msg = f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
+        if package.eta:
+            msg += f"\nETA: {package.eta}"
+
+        await send_message(msg)
