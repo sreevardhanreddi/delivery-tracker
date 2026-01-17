@@ -27,8 +27,23 @@ from services.tracker import track_all
 from services.tracking_service import update_package_tracking
 from tasks.tracker import update_packages_status
 
-SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
+import os
+from fastapi import FastAPI, Request, Form, Depends
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi import APIRouter, Depends
+from fastapi import Header, status
 
+
+SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 10))
+# Load env (if using python-dotenv, load it before)
+SECRET_KEY = os.getenv("SECRET_KEY", "devsecret")
+
+API_KEY = os.getenv("API_KEY", None)
+# Config credentials (plain text)
+AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "password")
 # Set up the scheduler
 scheduler = AsyncIOScheduler()
 # Add the job with proper configuration
@@ -40,6 +55,20 @@ scheduler.add_job(
     replace_existing=True,
 )
 
+
+def verify_api_key(request: Request,x_api_key: str = Header(None)):
+    """
+    Dependency to secure API routes with a shared API key.
+    Clients must include the header:
+        X-API-Key: <your_key_here>
+    """
+    if request.session.get("user"):
+        return
+    
+    if API_KEY is None:
+        raise HTTPException(status_code=500, detail="API key not configured on server")
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
@@ -58,20 +87,19 @@ app = FastAPI(title="Indian Courier Tracking API", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+
 logging.basicConfig(level=logging.INFO)
 
 
-@app.get("/health")
+@app.get("/health",dependencies=[Depends(verify_api_key)])
 def health():
     return {"status": "ok"}
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
 
-
-@app.get("/api/track")
+@app.get("/api/track",dependencies=[Depends(verify_api_key)])
 def list_packages(
     session: Session = Depends(get_session), offset: int = 0, limit: int = 100
 ):
@@ -84,7 +112,7 @@ def list_packages(
     return packages
 
 
-@app.post("/api/track", response_model=TrackPackage)
+@app.post("/api/track", response_model=TrackPackage,dependencies=[Depends(verify_api_key)])
 async def create_package(
     package: CreatePackage,
     background_tasks: BackgroundTasks,
@@ -113,7 +141,7 @@ async def create_package(
     return package_obj
 
 
-@app.delete("/api/track/{num}")
+@app.delete("/api/track/{num}",dependencies=[Depends(verify_api_key)])
 def delete_package(num: str, session: Session = Depends(get_session)):
     package = session.exec(
         select(TrackPackage).where(TrackPackage.number == num)
@@ -125,3 +153,52 @@ def delete_package(num: str, session: Session = Depends(get_session)):
         session.delete(package)
         session.commit()
     return {"success": True, "message": "Package deleted"}
+
+# --- Utility functions ---
+def get_current_user(request: Request):
+    return request.session.get("user")
+
+def require_login(request: Request):
+    """Redirects to /login if user not logged in."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    return None
+
+# --- Routes ---
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request):
+    # Already logged in
+    if get_current_user(request):
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username == AUTH_USERNAME and password == AUTH_PASSWORD:
+        request.session["user"] = username
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=302)
+
+# --- Protect the main page ---
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+    user = get_current_user(request)
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+
+@app.get("/dashboard")
+def dashboard(request: Request):
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+    user = get_current_user(request)
+    return {"message": f"Welcome, {user}"}
