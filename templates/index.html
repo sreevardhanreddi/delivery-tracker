@@ -214,6 +214,22 @@
     const progress = progressBar.querySelector('.progress');
     let requestCount = 0;
 
+    // Cache the last /api/track response so we only update the DOM when data changes
+    const TRACK_CACHE_KEY = 'trackCache.v1';
+    let lastResponseText = null;
+
+    function loadCachedPackagesToDom() {
+      try {
+        const cachedText = localStorage.getItem(TRACK_CACHE_KEY);
+        if (!cachedText) return;
+        lastResponseText = cachedText;
+        const packages = JSON.parse(cachedText);
+        formatPackages(packages);
+      } catch (e) {
+        console.warn('Failed to load cached packages:', e);
+      }
+    }
+
     function showProgress() {
       requestCount++;
       progressBar.classList.add('visible');
@@ -232,7 +248,8 @@
       }
     }
 
-    // Initial load of packages
+    // Initial load: render cached packages immediately (if available), then refresh
+    loadCachedPackagesToDom();
     refreshPackageList();
 
     // Set up periodic refresh
@@ -242,8 +259,29 @@
     function refreshPackageList() {
       showProgress();
       fetch('/api/track')
-        .then(response => response.json())
-        .then(packages => {
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          return response.text();
+        })
+        .then(text => {
+          const previous = lastResponseText ?? localStorage.getItem(TRACK_CACHE_KEY);
+
+          // Only update the DOM if the response changed
+          if (previous === text) {
+            return;
+          }
+
+          lastResponseText = text;
+          try {
+            localStorage.setItem(TRACK_CACHE_KEY, text);
+          } catch (e) {
+            // Ignore quota/disabled storage errors; DOM update is still ok
+            console.warn('Failed to persist track cache:', e);
+          }
+
+          const packages = JSON.parse(text);
           formatPackages(packages);
         })
         .catch(error => {
