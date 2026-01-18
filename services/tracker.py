@@ -422,17 +422,20 @@ def track_by_service(num: str, service: str) -> dict:
 def track_all(num: str) -> dict:
     logger.info(f"Tracking {num} with track_all")
     status = {"events": None, "service": None}
-    tasks = [
+
+    # Prioritize lightweight trackers first
+    lightweight_tasks = [
         bd_track,
         # dtdc_track,
-        dtdc_track_by_browser,
         ecom_express_track,
         delhivery_track,
         shadow_fax_track,
         ekart_track,
     ]
-    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-        futures = [executor.submit(task, num) for task in tasks]
+
+    # Try lightweight trackers first in parallel
+    with ThreadPoolExecutor(max_workers=len(lightweight_tasks)) as executor:
+        futures = [executor.submit(task, num) for task in lightweight_tasks]
         for future in futures:
             res = future.result()
             events = res.get("events", None)
@@ -440,6 +443,17 @@ def track_all(num: str) -> dict:
                 status["events"] = events
                 status["service"] = res.get("service")
                 status["eta"] = res.get("eta", "")
-                break
+                return status
+
+    # If no results from lightweight trackers, try resource-heavy browser tracker
+    logger.info(
+        f"No results from lightweight trackers, trying dtdc_track_by_browser for {num}"
+    )
+    res = dtdc_track_by_browser(num)
+    events = res.get("events", None)
+    if events is not None:
+        status["events"] = events
+        status["service"] = res.get("service")
+        status["eta"] = res.get("eta", "")
 
     return status
