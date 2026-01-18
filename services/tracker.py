@@ -7,7 +7,7 @@ import bs4
 import requests
 from loguru import logger
 
-from services.selenium_tracker import dtdc_track_srv
+from services.selenium_tracker import dtdc_track_srv, ekart_track_srv
 from utils.common import parse_date_time_string
 
 REQUEST_TIMEOUT = 120
@@ -178,6 +178,87 @@ def dtdc_track_by_browser(num: str) -> dict:
 
     except Exception as e:
         logger.error("An error occurred fetching from dtdc", e)
+    return status
+
+
+def ekart_track_by_browser(num: str) -> dict:
+    """Track Ekart using Selenium browser automation."""
+    logger.info(f"Tracking {num} with ekart_track_by_browser")
+    status = {"events": None, "service": None}
+    try:
+        response_text = ekart_track_srv(num)
+        if not response_text:
+            return status
+
+        try:
+            response_data = json.loads(response_text)
+        except Exception as e:
+            logger.error(f"Error parsing JSON from Ekart: {e}")
+            return status
+
+        # Handle different response formats
+        if isinstance(response_data, dict) and "tracking_events" in response_data:
+            # Fallback format with text events
+            events = []
+            for event_text in response_data.get("tracking_events", []):
+                events.append(
+                    {
+                        "location": "",
+                        "details": event_text,
+                        "date_time": None,
+                    }
+                )
+            if events:
+                status["events"] = events
+                status["service"] = "ekart"
+        elif isinstance(response_data, dict) and "data" in response_data:
+            # Structured data format
+            tracking_data = response_data.get("data", {}).get(num, {})
+            scans = tracking_data.get("scans", [])
+
+            events = []
+            for item in scans:
+                events.append(
+                    {
+                        "location": item.get("location", ""),
+                        "details": item.get("status_description", "")
+                        or item.get("scan_type", ""),
+                        "date_time": parse_date_time_string(
+                            item.get("scan_datetime", "")
+                        ),
+                    }
+                )
+
+            if events:
+                events.reverse()
+                status["events"] = events
+                status["service"] = "ekart"
+
+        elif isinstance(response_data, dict) and num in response_data:
+            # Ekart v2 API response captured from network: keyed by tracking id.
+            tracking_data = response_data.get(num) or {}
+            details_list = tracking_data.get("shipmentTrackingDetails") or []
+
+            events = []
+            for item in details_list:
+                events.append(
+                    {
+                        "location": item.get("city", ""),
+                        "details": item.get("statusDetails", ""),
+                        "date_time": parse_date_time_string(item.get("date")),
+                    }
+                )
+
+            if events:
+                events.reverse()
+                status["events"] = events
+                status["service"] = "ekart"
+                status["eta"] = parse_date_time_string(
+                    tracking_data.get("expectedDeliveryDate")
+                )
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from ekart_track_by_browser: {e}")
     return status
 
 
@@ -362,43 +443,6 @@ def shadow_fax_track(num: str) -> dict:
     return status
 
 
-def ekart_track(num: str) -> dict:
-    logger.info(f"Tracking {num} with ekart_track")
-    status = {"events": None, "service": None}
-    try:
-        headers = {
-            **get_common_headers(),
-            "origin": "https://www.ekartlogistics.com",
-            "referer": "https://www.ekartlogistics.com",
-        }
-        res = requests.post(
-            "http://www.ekartlogistics.com/ws/getTrackingDetails",
-            json={"trackingId": num},
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-        )
-        if res.status_code != 200:
-            logger.error("Error in fetching the data from ekart")
-            return status
-        data = res.json()
-        events = []
-        for item in data.get("shipmentTrackingDetails", []):
-            events.append(
-                {
-                    "location": item.get("city", ""),
-                    "details": item.get("statusDetails", ""),
-                    "date_time": parse_date_time_string(item.get("date", "")),
-                }
-            )
-
-        events.reverse()
-        status["events"] = events
-        status["service"] = "ekart"
-    except Exception as e:
-        logger.error(f"An error occurred fetching from ekart: {e}")
-    return status
-
-
 def track_by_service(num: str, service: str) -> dict:
     logger.info(f"Tracking {num} with {service}")
     status = {"events": None, "service": None}
@@ -413,7 +457,7 @@ def track_by_service(num: str, service: str) -> dict:
     elif service == "shadow_fax":
         return shadow_fax_track(num)
     elif service == "ekart":
-        return ekart_track(num)
+        return ekart_track_by_browser(num)
     else:
         logger.error(f"Invalid service: {service}")
         return status
@@ -426,11 +470,10 @@ def track_all(num: str) -> dict:
     # Prioritize lightweight trackers first
     lightweight_tasks = [
         bd_track,
-        # dtdc_track,
         ecom_express_track,
         delhivery_track,
         shadow_fax_track,
-        ekart_track,
+        # ekart_track,  # Disabled due to CSRF validation issues - too complex for API-only approach
     ]
 
     # Try lightweight trackers first in parallel
@@ -445,11 +488,23 @@ def track_all(num: str) -> dict:
                 status["eta"] = res.get("eta", "")
                 return status
 
-    # If no results from lightweight trackers, try resource-heavy browser tracker
+    # If no results from lightweight trackers, try resource-heavy browser trackers
     logger.info(
-        f"No results from lightweight trackers, trying dtdc_track_by_browser for {num}"
+        f"No results from lightweight trackers, trying browser-based trackers for {num}"
     )
+
+    # Try DTDC first
     res = dtdc_track_by_browser(num)
+    events = res.get("events", None)
+    if events is not None:
+        status["events"] = events
+        status["service"] = res.get("service")
+        status["eta"] = res.get("eta", "")
+        return status
+
+    # Try Ekart as last resort
+    logger.info(f"DTDC browser tracker failed, trying ekart_track_by_browser for {num}")
+    res = ekart_track_by_browser(num)
     events = res.get("events", None)
     if events is not None:
         status["events"] = events
