@@ -375,6 +375,11 @@ def delhivery_track(num: str) -> dict:
 
         status["events"] = events
         status["service"] = "delhivery"
+        status["eta"] = parse_date_time_string(
+            data["data"][0].get("promiseDeliveryDate", "")
+        )
+
+        print(status)
 
     except Exception as e:
         logger.error(f"An error occurred fetching from delhivery : {e}")
