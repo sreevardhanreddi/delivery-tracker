@@ -75,6 +75,23 @@ def bd_track(num: str) -> dict:
         status["events"] = events
         status["service"] = "bluedart"
 
+        eta = None
+        # BlueDart often renders ETA as human-readable text, e.g. "27 Jan 2026".
+        # Extract from normalized page text to avoid brittle tag assumptions.
+        page_text = soup.get_text(" ", strip=True)
+        eta_match = re.search(
+            r"Expected Date of Delivery\s*"
+            r"(\d{1,2}\s+[A-Za-z]{3}\s+\d{4}"
+            r"|\d{4}[-/]\d{1,2}[-/]\d{1,2}"
+            r"|\d{1,2}[-/]\d{1,2}[-/]\d{4})",
+            page_text,
+        )
+
+        if eta_match:
+            eta_str = eta_match.group(1).strip()
+            eta = parse_date_time_string(eta_str)
+        status["eta"] = eta
+
     except Exception as e:
         logger.error(f"An error occurred fetching from bluedart: {e}")
 
