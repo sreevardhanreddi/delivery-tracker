@@ -11,6 +11,11 @@ services:
     depends_on:
       migrations:
         condition: service_completed_successfully
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   migrations:
     build: .
@@ -19,3 +24,8 @@ services:
       - ./database.db:/code/database.db
     env_file:
       - .env
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

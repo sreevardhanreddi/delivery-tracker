@@ -395,31 +395,22 @@
         deleteButton.dataset.service = pkg.service;
         deleteButton.dataset.description = pkg.description;
 
-        // Parse and display events
+        // Display tracking events from the relationship
         const eventsTable = clone.querySelector('.events-table');
-        if (pkg.events) {
-          try {
-            const events = JSON.parse(pkg.events);
-            if (events.length > 0) {
-              // Sort events by date_time in descending order (newest first)
-              events.sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+        const events = pkg.tracking_events || [];
+        if (events.length > 0) {
+          // Sort events by date_time in descending order (newest first)
+          events.sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
 
-              events.forEach(event => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
-                `;
-                eventsTable.appendChild(row);
-              });
-            } else {
-              eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">No tracking events available</td></tr>';
-            }
-          } catch (e) {
-            console.error('Error parsing events:', e);
-            eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Error parsing tracking events</td></tr>';
-          }
+          events.forEach(event => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
+            `;
+            eventsTable.appendChild(row);
+          });
         } else {
           eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">No tracking events available</td></tr>';
         }

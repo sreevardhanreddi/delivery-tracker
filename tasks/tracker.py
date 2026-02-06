@@ -1,14 +1,13 @@
-import json
-
 from asyncer import asyncify
 from loguru import logger
 from sqlmodel import Session, select
 
 from database.connection import engine
 from models.track_package import TrackPackage
+from models.tracking_event import TrackingEvent
 from services.telegram import send_message
 from services.tracker import bd_track, track_all, track_by_service
-from utils.common import dict_to_str, json_dumps
+from utils.common import dict_to_str, parse_date_time_string
 
 
 async def update_packages_status():
@@ -26,13 +25,53 @@ async def update_packages_status():
             logger.info(
                 f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
             )
-            if json.loads(json_dumps(events[0])) != json.loads(package.events)[0]:
-                package.events = json_dumps(events)
+            # Check if the latest event has changed by comparing with DB
+            latest_db_event = session.exec(
+                select(TrackingEvent)
+                .where(TrackingEvent.package_id == package.id)
+                .order_by(TrackingEvent.date_time.desc())
+            ).first()
+            latest_event = events[0]
+            latest_event_date_time = latest_event.get("date_time")
+            if isinstance(latest_event_date_time, str):
+                latest_event_date_time = parse_date_time_string(latest_event_date_time)
+            has_changed = (
+                not latest_db_event
+                or latest_db_event.details != latest_event.get("details", "")
+                or latest_db_event.date_time != latest_event_date_time
+            )
+            if has_changed:
                 package.status = events[0]["details"]
                 eta = status.get("eta", "")
                 package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
                 session.add(package)
                 session.commit()
+
+                # Update TrackingEvent table: insert only new events
+                for event in events:
+                    date_time = event.get("date_time")
+                    if isinstance(date_time, str):
+                        date_time = parse_date_time_string(date_time)
+                    location = event.get("location", "")
+                    details = event.get("details", "")
+                    existing = session.exec(
+                        select(TrackingEvent).where(
+                            TrackingEvent.package_id == package.id,
+                            TrackingEvent.date_time == date_time,
+                            TrackingEvent.details == details,
+                            TrackingEvent.location == location,
+                        )
+                    ).first()
+                    if not existing:
+                        tracking_event = TrackingEvent(
+                            package_id=package.id,
+                            location=location,
+                            details=details,
+                            date_time=date_time,
+                        )
+                        session.add(tracking_event)
+                session.commit()
+
                 logger.info(
                     f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
                 )

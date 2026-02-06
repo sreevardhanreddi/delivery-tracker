@@ -4,12 +4,13 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 
-from utils.common import dict_to_str, json_dumps
+from utils.common import dict_to_str
 
 load_dotenv()
 
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import List
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,10 +19,12 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Req
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
 from database.connection import engine, get_session
-from models.track_package import CreatePackage, TrackPackage
+from models.track_package import CreatePackage, TrackPackage, TrackPackageRead
+from models.tracking_event import TrackingEvent
 from services.telegram import send_message
 from services.tracker import track_all
 from services.tracking_service import update_package_tracking
@@ -74,13 +77,15 @@ async def index(request: Request):
 def list_packages(
     session: Session = Depends(get_session), offset: int = 0, limit: int = 100
 ):
-    packages = session.exec(
+    stmt = (
         select(TrackPackage)
+        .options(joinedload(TrackPackage.tracking_events))
         .order_by(TrackPackage.created_at.desc())
         .offset(offset)
         .limit(limit)
-    ).all()
-    return packages
+    )
+    packages = session.execute(stmt).unique().scalars().all()
+    return [TrackPackageRead.model_validate(pkg) for pkg in packages]
 
 
 @app.post("/api/track", response_model=TrackPackage)
@@ -99,7 +104,6 @@ async def create_package(
         number=package.number,
         service="",
         description=package.description,
-        events="[{'location': '', 'details': '', 'date_time': ''}]",
         status="Tracking in progress...",
     )
     session.add(package_obj)
@@ -120,20 +124,13 @@ def delete_package(num: str, session: Session = Depends(get_session)):
     if package is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
-    else:
-        session.delete(package)
-        session.commit()
+    # Delete associated tracking events first
+    tracking_events = session.exec(
+        select(TrackingEvent).where(TrackingEvent.package_id == package.id)
+    ).all()
+    for event in tracking_events:
+        session.delete(event)
+
+    session.delete(package)
+    session.commit()
     return {"success": True, "message": "Package deleted"}
-
-
-if __name__ == "__main__":
-    from services.tracker import (
-        bd_track,
-        delhivery_track,
-        ekart_track_by_browser,
-        shadow_fax_track,
-        track_all,
-    )
-
-    res = bd_track("90385057770")
-    print(res)

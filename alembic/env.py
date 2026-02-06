@@ -21,6 +21,7 @@ if config.config_file_name is not None:
 from sqlmodel import SQLModel
 
 from models.track_package import TrackPackage  # noqa: F401
+from models.tracking_event import TrackingEvent  # noqa: F401
 
 target_metadata = SQLModel.metadata
 

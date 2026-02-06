@@ -1,26 +1,39 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from sqlmodel import Field, Relationship, SQLModel
 
-
-class TrackingEvent(BaseModel):
-    """
-    Schema for a single tracking event in a package's journey.
-    """
-
-    location: str = Field(..., description="Location where the event occurred")
-    details: str = Field(..., description="Description of the event")
-    date_time: datetime = Field(
-        ..., description="Date and time when the event occurred"
-    )
+if TYPE_CHECKING:
+    from models.track_package import TrackPackage
 
 
-class TrackingEvents(BaseModel):
-    """
-    Schema for a collection of tracking events.
-    """
+class TrackingEvent(SQLModel, table=True):
+    """Database model for a single tracking event in a package's journey."""
 
-    events: List[TrackingEvent] = Field(
-        default_factory=list, description="List of tracking events"
-    )
+    id: int = Field(default=None, primary_key=True)
+    package_id: int = Field(foreign_key="trackpackage.id", index=True)
+    location: str = Field(default="")
+    details: str = Field(default="")
+    date_time: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    package: Optional["TrackPackage"] = Relationship(back_populates="tracking_events")
+
+
+class TrackingEventCreate(BaseModel):
+    """Schema for creating a tracking event."""
+
+    location: str
+    details: str
+    date_time: datetime
+
+
+class TrackingEventResponse(BaseModel):
+    """Schema for tracking event API response."""
+
+    id: int
+    package_id: int
+    location: str
+    details: str
+    date_time: datetime

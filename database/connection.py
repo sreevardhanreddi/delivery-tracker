@@ -26,7 +26,8 @@ def get_connect_args() -> dict:
 
 database_url = get_database_url()
 connect_args = get_connect_args()
-engine = create_engine(database_url, connect_args=connect_args)
+debug_mode = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+engine = create_engine(database_url, connect_args=connect_args, echo=debug_mode)
 
 
 def get_session():
