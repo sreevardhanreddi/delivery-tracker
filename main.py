@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
-from database.connection import create_db_and_tables, engine, get_session
+from database.connection import engine, get_session
 from models.track_package import CreatePackage, TrackPackage
 from services.telegram import send_message
 from services.tracker import track_all
@@ -44,7 +44,6 @@ scheduler.add_job(
 # Ensure the scheduler shuts down properly on application exit.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db_and_tables()
     # Start the scheduler when the app starts
     scheduler.start()
     yield
@@ -125,3 +124,16 @@ def delete_package(num: str, session: Session = Depends(get_session)):
         session.delete(package)
         session.commit()
     return {"success": True, "message": "Package deleted"}
+
+
+if __name__ == "__main__":
+    from services.tracker import (
+        bd_track,
+        delhivery_track,
+        ekart_track_by_browser,
+        shadow_fax_track,
+        track_all,
+    )
+
+    res = bd_track("90385057770")
+    print(res)

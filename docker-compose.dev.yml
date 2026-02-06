@@ -10,5 +10,15 @@ services:
     restart: always
     env_file:
       - .env
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
 
-
+  migrations:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    volumes:
+      - ./database.db:/code/database.db
+      - ./alembic:/code/alembic
+    env_file:
+      - .env

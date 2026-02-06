@@ -8,4 +8,14 @@ services:
       - .env
     volumes:
       - ./database.db:/code/database.db
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
 
+  migrations:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    volumes:
+      - ./database.db:/code/database.db
+    env_file:
+      - .env

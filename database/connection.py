@@ -1,21 +1,32 @@
+import os
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
+from fastapi import Depends
+from sqlmodel import Session, SQLModel, create_engine
 
 
-def create_db_and_tables():
-    from database.migrations import run_migrations
+def get_database_url() -> str:
+    """Get database URL from environment variable or default to SQLite."""
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
 
-    SQLModel.metadata.create_all(engine)
-    # Run migrations to add any missing columns
-    run_migrations(engine)
+    # Default to SQLite
+    sqlite_path = os.getenv("SQLITE_PATH", "database.db")
+    return f"sqlite:///{sqlite_path}"
+
+
+def get_connect_args() -> dict:
+    """Get connection arguments based on database type."""
+    database_url = get_database_url()
+    if database_url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    return {}
+
+
+database_url = get_database_url()
+connect_args = get_connect_args()
+engine = create_engine(database_url, connect_args=connect_args)
 
 
 def get_session():
