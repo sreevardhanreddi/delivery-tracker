@@ -144,11 +144,11 @@
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-lg font-medium text-gray-900 dark:text-dark-text tracking-number break-words"></h3>
-            <div
+            <a href="#" target="_blank" rel="noopener noreferrer"
               class="service-chip flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full flex-shrink-0">
               <img class="h-4 w-4" src="" alt="" />
               <span class="whitespace-nowrap"></span>
-            </div>
+            </a>
             <div
               class="eta-chip hidden flex items-center space-x-1 px-3 py-1 text-xs font-semibold rounded-full bg-indigo-600 text-white flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24"
@@ -364,6 +364,7 @@
         serviceImage.alt = service.alt;
         serviceName.textContent = service.name;
         serviceChip.classList.add(service.color, 'text-white');
+        serviceChip.href = service.trackUrl.replace('{trackingNumber}', pkg.number);
 
         // Set ETA (if present)
         const etaChip = clone.querySelector('.eta-chip');
