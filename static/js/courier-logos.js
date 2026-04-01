@@ -43,6 +43,13 @@ const courierLogos = {
     trackUrl:
       "https://ekartlogistics.com/ekartlogistics-web/shipmenttrack/{trackingNumber}",
   },
+  xpressbees: {
+    name: "XpressBees",
+    color: "bg-blue-500",
+    logo: "/static/images/logos/xpressbees.png",
+    alt: "XpressBees Logo",
+    trackUrl: "https://www.xpressbees.com/shipment/tracking?awbNo={trackingNumber}",
+  },
   unknown: {
     name: "Unknown",
     color: "bg-gray-500",
@@ -70,6 +77,8 @@ function getCourierService(service) {
     return courierLogos.ecom_express;
   } else if (service === "ekart") {
     return courierLogos.ekart;
+  } else if (service === "xpressbees") {
+    return courierLogos.xpressbees;
   } else {
     return courierLogos.unknown;
   }

@@ -305,3 +305,167 @@ def ekart_track_srv(tracking_number: str):
         if "driver" in locals():
             driver.quit()
         return None
+
+
+def xpressbees_track_srv(tracking_number: str):
+    """Track XpressBees shipment using Selenium and capture XHR responses."""
+
+    # ── Tuneable flags ────────────────────────────────────────────────────────
+    HEADLESS = True
+    PAGE_IDLE_TIMEOUT = 15  # seconds to wait for page load network idle
+    ALTCHA_WAIT_TIMEOUT = 20  # seconds to wait for ALTCHA to reach "verified"
+    POST_ALTCHA_IDLE_TIMEOUT = 8  # seconds to wait for post-verification idle
+    SEARCH_BTN_TIMEOUT = 8  # seconds to wait for Search button to be clickable
+    API_IDLE_TIMEOUT = 10  # seconds to wait for tracking API network idle
+    API_CAPTURE_TIMEOUT = 15  # seconds to poll for the captured API response bodies
+    # ─────────────────────────────────────────────────────────────────────────
+
+    link = f"https://www.xpressbees.com/shipment/tracking?awbNo={tracking_number}"
+
+    chrome_options = Options()
+    if HEADLESS:
+        chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    if os.environ.get("CHROME_BIN"):
+        chrome_options.binary_location = os.environ.get("CHROME_BIN")
+        logger.info(f"Using Chromium binary at: {os.environ.get('CHROME_BIN')}")
+
+    chrome_options.set_capability(
+        "goog:loggingPrefs", {"performance": "ALL", "browser": "ALL"}
+    )
+
+    try:
+        logger.info(f"Launching browser for XpressBees tracking: {tracking_number}")
+
+        chromedriver_path = find_chromedriver()
+        if chromedriver_path:
+            logger.info(f"Using ChromeDriver at: {chromedriver_path}")
+            service = Service(executable_path=chromedriver_path)
+        else:
+            logger.warning("ChromeDriver path not found, using default Service")
+            service = Service()
+
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        try:
+            driver.execute_cdp_cmd("Network.enable", {})
+        except Exception as e:
+            logger.debug(f"Could not enable CDP Network domain for XpressBees: {e}")
+
+        driver.get(link)
+
+        # Step 1: wait for the page to fully load and initial network requests to idle.
+        logger.info("XpressBees: waiting for page load + network idle...")
+        wait_for_network_idle(driver, timeout=PAGE_IDLE_TIMEOUT)
+
+        # Step 2: click the checkbox input inside altcha-widget > .altcha-checkbox.
+        # The altcha-widget is a Vue component with light DOM (no shadow root).
+        logger.info("XpressBees: clicking .altcha-checkbox input...")
+        try:
+            altcha_input = WebDriverWait(driver, ALTCHA_WAIT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "altcha-widget .altcha-checkbox input")
+                )
+            )
+            driver.execute_script("arguments[0].click();", altcha_input)
+            logger.info("XpressBees: .altcha-checkbox input clicked")
+        except Exception as e:
+            logger.warning(f"XpressBees: could not click .altcha-checkbox input: {e}")
+
+        # Step 3: wait for ALTCHA to finish verifying (data-state becomes "verified").
+        logger.info("XpressBees: waiting for altcha verification to complete...")
+        try:
+            WebDriverWait(driver, ALTCHA_WAIT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "altcha-widget .altcha[data-state='verified']")
+                )
+            )
+            logger.info("XpressBees: ALTCHA verified")
+        except Exception as e:
+            logger.warning(
+                f"XpressBees: timed out waiting for ALTCHA verified state: {e}"
+            )
+        wait_for_network_idle(driver, timeout=POST_ALTCHA_IDLE_TIMEOUT)
+
+        # Step 4: click the Search button (matched by text — multiple submit buttons exist).
+        # Start collecting performance logs BEFORE clicking so the Network.responseReceived
+        # event for /api/tracking is not drained by a wait_for_network_idle call.
+        driver.get_log("performance")  # flush stale pre-click entries
+        logger.info("XpressBees: clicking Search button...")
+        try:
+            search_button = WebDriverWait(driver, SEARCH_BTN_TIMEOUT).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[normalize-space(.)='Search']")
+                )
+            )
+            driver.execute_script("arguments[0].click();", search_button)
+            logger.info("XpressBees: Search button clicked")
+        except Exception as e:
+            logger.warning(f"XpressBees: could not click Search button: {e}")
+
+        # Step 5: poll CDP logs directly for the POST /api/tracking response.
+        # (Intentionally no wait_for_network_idle here — it consumes the log entries.)
+        tracking_api_url = "https://www.xpressbees.com/api/tracking"
+        api_request_id = None
+        api_response_text = None
+
+        start_time = time.time()
+        while time.time() - start_time < API_CAPTURE_TIMEOUT:
+            try:
+                logs = driver.get_log("performance")
+            except Exception as e:
+                logger.debug(f"Could not read XpressBees performance logs: {e}")
+                logs = []
+
+            for entry in logs:
+                try:
+                    message = json.loads(entry.get("message", "{}")).get("message", {})
+                    if message.get("method") != "Network.responseReceived":
+                        continue
+                    params = message.get("params", {})
+                    response = params.get("response", {})
+                    if response.get("url") == tracking_api_url and not api_request_id:
+                        api_request_id = params.get("requestId")
+                except Exception:
+                    continue
+
+            if api_request_id and not api_response_text:
+                try:
+                    body = driver.execute_cdp_cmd(
+                        "Network.getResponseBody", {"requestId": api_request_id}
+                    )
+                    text = body.get("body")
+                    if body.get("base64Encoded") and text:
+                        import base64
+
+                        text = base64.b64decode(text).decode("utf-8")
+                    if text:
+                        api_response_text = text
+                except Exception as e:
+                    logger.debug(f"XpressBees POST response body not ready yet: {e}")
+
+            if api_response_text:
+                logger.info("Captured XpressBees POST tracking JSON from network")
+                logger.debug(f"XpressBees post_response: {api_response_text}")
+                driver.quit()
+                return api_response_text
+
+            time.sleep(0.5)
+
+        logger.warning(
+            "XpressBees: API response not captured, falling back to page HTML"
+        )
+        html = driver.page_source
+        driver.quit()
+        return html
+
+    except Exception as e:
+        logger.error(f"Error in XpressBees tracking: {str(e)}")
+        if "driver" in locals():
+            driver.quit()
+        return None

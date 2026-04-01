@@ -22,7 +22,13 @@ def parse_date_time_string(date_time_string):
         "%Y-%m-%d %H:%M:%S.%f",  # Format: 2025-04-02 19:36:37.0
         "%d %b %Y %H:%M",  # Format: 07 Oct 2024 22:24
         "%d %b %Y",  # Format: 27 Jan 2026
+        "%b %d, %Y %H:%M",  # Format: Mar 30, 2026 17:21 (XpressBees)
+        "%b %d, %Y",  # Format: Mar 30, 2026
+        "%d/%m/%Y %I:%M:%S %p",  # Format: 6/4/2026 3:35:00 PM (XpressBees EDD, day-first)
+        "%d/%m/%Y %I:%M %p",  # Format: 6/4/2026 3:35 PM
+        "%d/%m/%Y",  # Format: 6/4/2026
         "%d-%m-%Y %H:%M:%S",  # Format: 05-12-2024 11:03:59
+        "%d-%m-%Y",  # Format: 01-04-2026 (XpressBees shippingDate, day-first)
         "%Y-%m-%dT%H:%M:%S.%f",  # ISO 8601 Format: 2024-12-05T05:11:40.736000
         "%Y-%m-%dT%H:%M:%S",
         "%d %B %Y, %A",  # Format: 16 January 2026, Friday

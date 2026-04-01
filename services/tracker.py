@@ -1,13 +1,18 @@
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from itertools import zip_longest
 
 import bs4
 import requests
 from loguru import logger
 
-from services.selenium_tracker import dtdc_track_srv, ekart_track_srv
+from services.selenium_tracker import (
+    dtdc_track_srv,
+    ekart_track_srv,
+    xpressbees_track_srv,
+)
 from utils.common import parse_date_time_string
 
 REQUEST_TIMEOUT = 120
@@ -279,6 +284,76 @@ def ekart_track_by_browser(num: str) -> dict:
     return status
 
 
+def xpressbees_track_by_browser(num: str) -> dict:
+    logger.info(f"Tracking {num} with xpressbees_track_by_browser")
+    status = {"events": None, "service": None}
+    try:
+        response_text = xpressbees_track_srv(num)
+        if not response_text:
+            return status
+
+        events = []
+        eta = None
+
+        # POST /api/tracking response: {"domestic": [{"status","shippingDate","origin","EDD"}]}
+        try:
+            payload = json.loads(response_text)
+        except Exception:
+            return status
+
+        if not isinstance(payload, dict):
+            return status
+
+        for item in (payload.get("domestic") or []) + (
+            payload.get("international") or []
+        ):
+            details = item.get("status") or ""
+            date_str = item.get("shippingDate") or ""
+            location = item.get("origin") or ""
+            if details and date_str:
+                events.append(
+                    {
+                        "location": location.strip(),
+                        "details": details.strip(),
+                        "date_time": parse_date_time_string(date_str),
+                    }
+                )
+            edd = item.get("EDD") or ""
+            if eta is None and edd:
+                eta = parse_date_time_string(edd)
+
+        if not events:
+            return status
+
+        deduped_events = []
+        seen = set()
+        for event in events:
+            dt = event.get("date_time")
+            dedupe_key = (
+                event.get("details", ""),
+                event.get("location", ""),
+                dt.isoformat() if dt else "",
+            )
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            deduped_events.append(event)
+
+        deduped_events.sort(
+            key=lambda e: e.get("date_time") or datetime.min,
+            reverse=True,
+        )
+
+        status["events"] = deduped_events
+        status["service"] = "xpressbees"
+        status["eta"] = eta
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from xpressbees: {e}")
+
+    return status
+
+
 def ecom_express_track(num: str) -> dict:
     logger.info(f"Tracking {num} with ecom_express_track")
     status = {"events": None, "service": None}
@@ -480,6 +555,8 @@ def track_by_service(num: str, service: str) -> dict:
         return shadow_fax_track(num)
     elif service == "ekart":
         return ekart_track_by_browser(num)
+    elif service == "xpressbees":
+        return xpressbees_track_by_browser(num)
     else:
         logger.error(f"Invalid service: {service}")
         return status
@@ -514,6 +591,15 @@ def track_all(num: str) -> dict:
     logger.info(
         f"No results from lightweight trackers, trying browser-based trackers for {num}"
     )
+
+    # Try XpressBees
+    res = xpressbees_track_by_browser(num)
+    events = res.get("events", None)
+    if events is not None:
+        status["events"] = events
+        status["service"] = res.get("service")
+        status["eta"] = res.get("eta", "")
+        return status
 
     # Try DTDC first
     res = dtdc_track_by_browser(num)
