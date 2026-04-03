@@ -134,3 +134,15 @@ def delete_package(num: str, session: Session = Depends(get_session)):
     session.delete(package)
     session.commit()
     return {"success": True, "message": "Package deleted"}
+
+
+@app.post("/api/track/{num}/refresh")
+async def refresh_package(num: str, session: Session = Depends(get_session)):
+    package = session.exec(
+        select(TrackPackage).where(TrackPackage.number == num)
+    ).first()
+    if package is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+
+    await update_package_tracking(package.id, package.number)
+    return {"success": True, "message": "Package refreshed"}

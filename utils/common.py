@@ -57,6 +57,25 @@ def parse_date_time_string(date_time_string):
     return None
 
 
+DELIVERED_STATUSES = {
+    "Shipment Delivered",
+    "Successfully Delivered",
+    "Delivered",
+    "Shipment delivered",
+    "Shipment has been delivered",
+}
+
+
+def is_delivered_status(status: str) -> bool:
+    return str(status) in DELIVERED_STATUSES
+
+
+def normalize_package_status(status: str) -> str:
+    if is_delivered_status(status):
+        return "Delivered"
+    return status
+
+
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):

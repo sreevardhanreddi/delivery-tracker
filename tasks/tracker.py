@@ -7,7 +7,12 @@ from models.track_package import TrackPackage
 from models.tracking_event import TrackingEvent
 from services.telegram import send_message
 from services.tracker import bd_track, track_all, track_by_service
-from utils.common import dict_to_str, parse_date_time_string
+from utils.common import (
+    dict_to_str,
+    is_delivered_status,
+    normalize_package_status,
+    parse_date_time_string,
+)
 
 
 async def update_packages_status():
@@ -25,23 +30,23 @@ async def update_packages_status():
             logger.info(
                 f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
             )
-            # Check if the latest event has changed by comparing with DB
-            latest_db_event = session.exec(
-                select(TrackingEvent)
-                .where(TrackingEvent.package_id == package.id)
-                .order_by(TrackingEvent.date_time.desc())
-            ).first()
             latest_event = events[0]
             latest_event_date_time = latest_event.get("date_time")
             if isinstance(latest_event_date_time, str):
                 latest_event_date_time = parse_date_time_string(latest_event_date_time)
-            has_changed = (
-                not latest_db_event
-                or latest_db_event.details != latest_event.get("details", "")
-                or latest_db_event.date_time != latest_event_date_time
-            )
+            latest_event_location = latest_event.get("location", "")
+            latest_event_details = latest_event.get("details", "")
+            latest_event_in_db = session.exec(
+                select(TrackingEvent).where(
+                    TrackingEvent.package_id == package.id,
+                    TrackingEvent.date_time == latest_event_date_time,
+                    TrackingEvent.details == latest_event_details,
+                    TrackingEvent.location == latest_event_location,
+                )
+            ).first()
+            has_changed = latest_event_in_db is None
             if has_changed:
-                package.status = events[0]["details"]
+                package.status = normalize_package_status(events[0]["details"])
                 eta = status.get("eta", "")
                 package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
                 session.add(package)
@@ -79,13 +84,7 @@ async def update_packages_status():
                     f"Package {package.number} {package.service} {package.description} updated to {dict_to_str(events[0])}"
                 )
 
-            if str(events[0]["details"]) in [
-                "Shipment Delivered",
-                "Successfully Delivered",
-                "Delivered",
-                "Shipment delivered",
-                "Shipment has been delivered",
-            ]:
+            if is_delivered_status(events[0]["details"]):
                 logger.info(f"Package {package.number} delivered")
                 await send_message(f"Package {package.number} delivered")
                 logger.info(f"Updating package status {package.number} to Delivered.")

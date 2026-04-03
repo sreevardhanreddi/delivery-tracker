@@ -6,7 +6,7 @@ from models.track_package import TrackPackage
 from models.tracking_event import TrackingEvent
 from services.telegram import send_message
 from services.tracker import track_all
-from utils.common import dict_to_str, parse_date_time_string
+from utils.common import dict_to_str, normalize_package_status, parse_date_time_string
 
 
 async def update_package_tracking(package_id: int, tracking_number: str):
@@ -28,11 +28,29 @@ async def update_package_tracking(package_id: int, tracking_number: str):
             return
 
         package.service = status.get("service", "")
-        package.status = events[0]["details"]
+        package.status = normalize_package_status(events[0]["details"])
         eta = status.get("eta", "")
         package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
         session.add(package)
         session.commit()
+
+        latest_event = events[0]
+        latest_event_date_time = latest_event.get("date_time")
+        if isinstance(latest_event_date_time, str):
+            latest_event_date_time = parse_date_time_string(latest_event_date_time)
+        latest_event_location = latest_event.get("location", "")
+        latest_event_details = latest_event.get("details", "")
+        should_notify = (
+            session.exec(
+                select(TrackingEvent).where(
+                    TrackingEvent.package_id == package_id,
+                    TrackingEvent.date_time == latest_event_date_time,
+                    TrackingEvent.details == latest_event_details,
+                    TrackingEvent.location == latest_event_location,
+                )
+            ).first()
+            is None
+        )
 
         # Store events in the TrackingEvent table (skip duplicates)
         for event in events:
@@ -63,4 +81,5 @@ async def update_package_tracking(package_id: int, tracking_number: str):
         if package.eta:
             msg += f"\nETA: {package.eta}"
 
-        await send_message(msg)
+        if should_notify:
+            await send_message(msg)

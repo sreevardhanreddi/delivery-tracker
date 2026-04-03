@@ -70,6 +70,20 @@
     .progress-bar .progress.complete {
       width: 100%;
     }
+
+    .refresh-package.loading svg {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
 
@@ -170,6 +184,16 @@
               viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd"
                 d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clip-rule="evenodd" />
+            </svg>
+          </button>
+          <!-- Refresh button -->
+          <button type="button"
+            class="refresh-package text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh package">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M15.312 11.424a5 5 0 01-9.736 1.302 1 1 0 00-1.948.456 7 7 0 0013.646-1.823H18a1 1 0 000-2h-3a1 1 0 00-1 1v2.424zm-10.624-2.848a5 5 0 019.736-1.302 1 1 0 101.948-.456A7 7 0 002.728 8.642H2a1 1 0 100 2h3a1 1 0 001-1V7.218z"
                 clip-rule="evenodd" />
             </svg>
           </button>
@@ -396,6 +420,15 @@
         deleteButton.dataset.service = pkg.service;
         deleteButton.dataset.description = pkg.description;
 
+        // Update refresh button metadata
+        const refreshButton = clone.querySelector('.refresh-package');
+        refreshButton.dataset.trackingNumber = pkg.number;
+        refreshButton.dataset.service = pkg.service;
+        refreshButton.dataset.description = pkg.description;
+        if (pkg.status === 'Delivered') {
+          refreshButton.remove();
+        }
+
         // Display tracking events from the relationship
         const eventsTable = clone.querySelector('.events-table');
         const events = pkg.tracking_events || [];
@@ -424,6 +457,9 @@
 
       // Set up delete button functionality
       setupDeleteButtons();
+
+      // Set up refresh button functionality
+      setupRefreshButtons();
     }
 
     // Function to set up accordion functionality
@@ -477,6 +513,43 @@
                 completeProgress();
               });
           }
+        });
+      });
+    }
+
+    function setupRefreshButtons() {
+      document.querySelectorAll('.refresh-package').forEach(button => {
+        button.addEventListener('click', function () {
+          const trackingNumber = this.dataset.trackingNumber;
+          const originalTitle = this.title;
+
+          this.disabled = true;
+          this.classList.add('loading');
+          this.title = 'Refreshing...';
+          showProgress();
+
+          fetch(`/api/track/${trackingNumber}/refresh`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to refresh package');
+              }
+              refreshPackageList();
+            })
+            .catch(error => {
+              console.error('Error refreshing package:', error);
+              alert('Failed to refresh package. Please try again.');
+            })
+            .finally(() => {
+              this.disabled = false;
+              this.classList.remove('loading');
+              this.title = originalTitle;
+              completeProgress();
+            });
         });
       });
     }
