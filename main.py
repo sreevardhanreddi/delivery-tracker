@@ -15,10 +15,19 @@ from typing import List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+)
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
@@ -75,16 +84,38 @@ async def index(request: Request):
 
 @app.get("/api/track")
 def list_packages(
-    session: Session = Depends(get_session), offset: int = 0, limit: int = 100
+    response: Response,
+    session: Session = Depends(get_session),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
+    q: str | None = Query(None, min_length=3),
 ):
+    filters = []
+    if q:
+        search = f"%{q}%"
+        filters.append(
+            or_(
+                TrackPackage.number.ilike(search),
+                TrackPackage.description.ilike(search),
+            )
+        )
+
+    count_stmt = select(func.count()).select_from(TrackPackage)
+    if filters:
+        count_stmt = count_stmt.where(*filters)
+    total = session.exec(count_stmt).one()
+
     stmt = (
         select(TrackPackage)
         .options(joinedload(TrackPackage.tracking_events))
         .order_by(TrackPackage.created_at.desc())
-        .offset(offset)
-        .limit(limit)
     )
+    if filters:
+        stmt = stmt.where(*filters)
+    stmt = stmt.offset(offset).limit(limit)
+
     packages = session.execute(stmt).unique().scalars().all()
+    response.headers["X-Total-Count"] = str(total)
     return [TrackPackageRead.model_validate(pkg) for pkg in packages]
 
 

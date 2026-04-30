@@ -144,7 +144,37 @@
 
     <!-- Package list -->
     <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 transition-colors duration-200">
-      <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-dark-text">Tracked Packages</h2>
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-dark-text">Tracked Packages</h2>
+        <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="w-full lg:max-w-md">
+            <label for="package-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Search
+              packages</label>
+            <div class="relative mt-1">
+              <div
+                class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd"
+                    d="M9 3.5a5.5 5.5 0 104.395 8.802l2.651 2.652a.75.75 0 101.061-1.061l-2.652-2.651A5.5 5.5 0 009 3.5zM5 9a4 4 0 118 0 4 4 0 01-8 0z"
+                    clip-rule="evenodd" />
+                </svg>
+              </div>
+              <input type="search" id="package-search" placeholder="Search number or description"
+                class="block w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 shadow-sm transition duration-200 placeholder:text-gray-400 hover:border-indigo-300 hover:bg-white focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:hover:border-indigo-500 dark:hover:bg-gray-700 dark:focus:border-indigo-400 dark:focus:bg-gray-700 dark:focus:ring-indigo-500/20">
+            </div>
+            <p id="search-help" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Enter at least 3 characters.</p>
+          </div>
+          <div id="pagination-controls" class="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end hidden">
+            <p id="pagination-summary" class="text-sm text-gray-500 dark:text-gray-400"></p>
+            <div class="flex items-center gap-2">
+              <button type="button" id="prev-page"
+                class="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700">Previous</button>
+              <button type="button" id="next-page"
+                class="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="package-list">
         <!-- Packages will be loaded here -->
       </div>
@@ -238,9 +268,14 @@
     const progress = progressBar.querySelector('.progress');
     let requestCount = 0;
 
-    // Cache the last /api/track response so we only update the DOM when data changes
-    const TRACK_CACHE_KEY = 'trackCache.v1';
+    // Cache the first page so the UI can render quickly before the fresh response arrives.
+    const TRACK_CACHE_KEY = 'trackCache.v2';
+    const PAGE_SIZE = 3;
     let lastResponseText = null;
+    let currentPage = 1;
+    let totalPackages = 0;
+    let currentSearch = '';
+    let searchDebounce = null;
 
     function loadCachedPackagesToDom() {
       try {
@@ -276,37 +311,70 @@
     loadCachedPackagesToDom();
     refreshPackageList();
 
+    document.getElementById('package-search').addEventListener('input', function () {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => {
+        const value = this.value.trim();
+        currentSearch = value.length >= 3 ? value : '';
+        currentPage = 1;
+        lastResponseText = null;
+        refreshPackageList();
+      }, 300);
+    });
+
+    document.getElementById('prev-page').addEventListener('click', function () {
+      if (currentPage > 1) {
+        currentPage--;
+        lastResponseText = null;
+        refreshPackageList();
+      }
+    });
+
+    document.getElementById('next-page').addEventListener('click', function () {
+      if (currentPage < Math.ceil(totalPackages / PAGE_SIZE)) {
+        currentPage++;
+        lastResponseText = null;
+        refreshPackageList();
+      }
+    });
+
     // Set up periodic refresh
     setInterval(refreshPackageList, 16000);
 
     // Function to refresh the package list
     function refreshPackageList() {
+      const params = new URLSearchParams({
+        limit: PAGE_SIZE,
+        offset: (currentPage - 1) * PAGE_SIZE
+      });
+      if (currentSearch) {
+        params.set('q', currentSearch);
+      }
+
       showProgress();
-      fetch('/api/track')
+      fetch(`/api/track?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Request failed with status ${response.status}`);
           }
+          totalPackages = Number(response.headers.get('X-Total-Count') || '0');
           return response.text();
         })
         .then(text => {
-          const previous = lastResponseText ?? localStorage.getItem(TRACK_CACHE_KEY);
-
-          // Only update the DOM if the response changed
-          if (previous === text) {
-            return;
-          }
-
+          const useCache = !currentSearch && currentPage === 1;
           lastResponseText = text;
-          try {
-            localStorage.setItem(TRACK_CACHE_KEY, text);
-          } catch (e) {
-            // Ignore quota/disabled storage errors; DOM update is still ok
-            console.warn('Failed to persist track cache:', e);
+          if (useCache) {
+            try {
+              localStorage.setItem(TRACK_CACHE_KEY, text);
+            } catch (e) {
+              // Ignore quota/disabled storage errors; DOM update is still ok
+              console.warn('Failed to persist track cache:', e);
+            }
           }
 
           const packages = JSON.parse(text);
           formatPackages(packages);
+          updatePaginationControls();
         })
         .catch(error => {
           console.error('Error refreshing package list:', error);
@@ -314,6 +382,26 @@
         .finally(() => {
           completeProgress();
         });
+    }
+
+    function updatePaginationControls() {
+      const controls = document.getElementById('pagination-controls');
+      const summary = document.getElementById('pagination-summary');
+      const prevButton = document.getElementById('prev-page');
+      const nextButton = document.getElementById('next-page');
+      const totalPages = Math.max(1, Math.ceil(totalPackages / PAGE_SIZE));
+
+      if (totalPackages <= PAGE_SIZE && currentPage === 1) {
+        controls.classList.add('hidden');
+      } else {
+        controls.classList.remove('hidden');
+      }
+
+      const start = totalPackages === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+      const end = Math.min(currentPage * PAGE_SIZE, totalPackages);
+      summary.textContent = `Showing ${start}-${end} of ${totalPackages}`;
+      prevButton.disabled = currentPage === 1;
+      nextButton.disabled = currentPage >= totalPages;
     }
 
     // Add this at the beginning of your script section
@@ -346,6 +434,8 @@
           // Clear the form
           this.reset();
           // Refresh the package list
+          currentPage = 1;
+          lastResponseText = null;
           refreshPackageList();
         })
         .catch(error => {
@@ -366,7 +456,8 @@
       container.innerHTML = '';
 
       if (packages.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No packages tracked yet.</p>';
+        container.innerHTML = `<p class="text-gray-500 dark:text-gray-400">${currentSearch ? 'No packages match your search.' : 'No packages tracked yet.'}</p>`;
+        updatePaginationControls();
         return;
       }
 
