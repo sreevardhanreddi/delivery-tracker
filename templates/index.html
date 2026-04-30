@@ -144,10 +144,10 @@
 
     <!-- Package list -->
     <div class="bg-white dark:bg-dark-card rounded-lg shadow-md p-6 transition-colors duration-200">
-      <div class="mb-4">
+      <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <h2 class="text-xl font-semibold text-gray-800 dark:text-dark-text">Tracked Packages</h2>
-        <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="w-full lg:max-w-md">
+        <div class="flex w-full flex-col gap-4 lg:w-auto lg:flex-row lg:items-start lg:justify-end">
+          <div class="w-full lg:w-96">
             <label for="package-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Search
               packages</label>
             <div class="relative mt-1">
@@ -164,7 +164,8 @@
             </div>
             <p id="search-help" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Enter at least 3 characters.</p>
           </div>
-          <div id="pagination-controls" class="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end hidden">
+          <div id="pagination-controls"
+            class="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end hidden lg:pt-7">
             <p id="pagination-summary" class="text-sm text-gray-500 dark:text-gray-400"></p>
             <div class="flex items-center gap-2">
               <button type="button" id="prev-page"
@@ -183,7 +184,7 @@
 
   <!-- Package item template -->
   <template id="package-template">
-    <div class="border-b border-gray-200 dark:border-dark-border py-4 last:border-b-0">
+    <div class="package-item border-b border-gray-200 dark:border-dark-border py-4 last:border-b-0">
       <div class="flex justify-between items-start gap-2">
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-2">
@@ -276,6 +277,7 @@
     let totalPackages = 0;
     let currentSearch = '';
     let searchDebounce = null;
+    const openPackages = new Set();
 
     function loadCachedPackagesToDom() {
       try {
@@ -465,6 +467,8 @@
 
       packages.forEach(pkg => {
         const clone = template.content.cloneNode(true);
+        const packageItem = clone.querySelector('.package-item');
+        packageItem.dataset.trackingNumber = pkg.number;
 
         // Set tracking number
         clone.querySelector('.tracking-number').textContent = pkg.number;
@@ -540,6 +544,13 @@
           eventsTable.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">No tracking events available</td></tr>';
         }
 
+        if (openPackages.has(pkg.number)) {
+          const accordionContent = clone.querySelector('.accordion-content');
+          const accordionIcon = clone.querySelector('.accordion-toggle svg');
+          accordionContent.classList.remove('hidden');
+          accordionIcon.classList.add('rotate-180');
+        }
+
         container.appendChild(clone);
       });
 
@@ -557,16 +568,20 @@
     function setupAccordions() {
       document.querySelectorAll('.accordion-toggle').forEach(toggle => {
         toggle.addEventListener('click', function () {
-          const content = this.closest('.border-b').querySelector('.accordion-content');
+          const packageItem = this.closest('.package-item');
+          const trackingNumber = packageItem.dataset.trackingNumber;
+          const content = packageItem.querySelector('.accordion-content');
           const icon = this.querySelector('svg');
 
           // Toggle the content visibility
           if (content.classList.contains('hidden')) {
             content.classList.remove('hidden');
             icon.classList.add('rotate-180');
+            openPackages.add(trackingNumber);
           } else {
             content.classList.add('hidden');
             icon.classList.remove('rotate-180');
+            openPackages.delete(trackingNumber);
           }
         });
       });
@@ -593,6 +608,7 @@
                 if (!response.ok) {
                   throw new Error('Failed to delete package');
                 }
+                openPackages.delete(trackingNumber);
                 // Refresh the package list
                 refreshPackageList();
               })
