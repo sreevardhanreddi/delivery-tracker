@@ -50,6 +50,13 @@ const courierLogos = {
     alt: "XpressBees Logo",
     trackUrl: "https://www.xpressbees.com/shipment/tracking?awbNo={trackingNumber}",
   },
+  shree_maruti: {
+    name: "Shree Maruti",
+    color: "bg-orange-500",
+    logo: "https://shreemaruti.com/wp-content/uploads/2024/10/cropped-fav-32x32.jpg",
+    alt: "Shree Maruti Logo",
+    trackUrl: "https://shreemaruti.com/track-shipment/{trackingNumber}",
+  },
   unknown: {
     name: "Unknown",
     color: "bg-gray-500",
@@ -79,6 +86,8 @@ function getCourierService(service) {
     return courierLogos.ekart;
   } else if (service === "xpressbees") {
     return courierLogos.xpressbees;
+  } else if (service === "shree_maruti") {
+    return courierLogos.shree_maruti;
   } else {
     return courierLogos.unknown;
   }

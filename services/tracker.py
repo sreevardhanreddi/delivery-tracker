@@ -540,6 +540,72 @@ def shadow_fax_track(num: str) -> dict:
     return status
 
 
+def shree_maruti_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with shree_maruti_track")
+    status = {"events": None, "service": None}
+    try:
+        headers = {
+            **get_common_headers(),
+            "accept": "*/*",
+            "origin": "https://tracking.shreemaruti.com",
+            "referer": "https://tracking.shreemaruti.com/",
+            "sec-fetch-site": "cross-site",
+        }
+        res = requests.get(
+            f"https://apis-hubops.innofulfill.com/tracking/v2/{num}",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if res.status_code != 200:
+            logger.error(
+                f"Failed to fetch data from Shree Maruti API. Status code: {res.status_code}"
+            )
+            return status
+
+        payload = res.json()
+        statuses = payload.get("statuses") or []
+        if not isinstance(statuses, list) or not statuses:
+            return status
+
+        events = []
+        for item in statuses:
+            details = (
+                item.get("subcategory") or item.get("status") or item.get("event") or ""
+            )
+            location = item.get("location") or ""
+
+            date_time = None
+            ts = item.get("statusTimestamp")
+            if isinstance(ts, (int, float)):
+                date_time = datetime.fromtimestamp(ts / 1000)
+            elif isinstance(ts, str) and ts.strip():
+                date_time = parse_date_time_string(ts)
+
+            events.append(
+                {
+                    "location": location,
+                    "details": details,
+                    "date_time": date_time,
+                }
+            )
+
+        if not events:
+            return status
+
+        events.sort(
+            key=lambda e: e.get("date_time") or datetime.min,
+            reverse=True,
+        )
+
+        status["events"] = events
+        status["service"] = "shree_maruti"
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from shree maruti: {e}")
+
+    return status
+
+
 def track_by_service(num: str, service: str) -> dict:
     logger.info(f"Tracking {num} with {service}")
     status = {"events": None, "service": None}
@@ -557,6 +623,8 @@ def track_by_service(num: str, service: str) -> dict:
         return ekart_track_by_browser(num)
     elif service == "xpressbees":
         return xpressbees_track_by_browser(num)
+    elif service == "shree_maruti":
+        return shree_maruti_track(num)
     else:
         logger.error(f"Invalid service: {service}")
         return status
@@ -572,6 +640,7 @@ def track_all(num: str) -> dict:
         ecom_express_track,
         delhivery_track,
         shadow_fax_track,
+        shree_maruti_track,
         # ekart_track,  # Disabled due to CSRF validation issues - too complex for API-only approach
     ]
 
