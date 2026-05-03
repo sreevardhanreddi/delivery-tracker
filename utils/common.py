@@ -63,6 +63,7 @@ DELIVERED_STATUSES = {
     "Delivered",
     "Shipment delivered",
     "Shipment has been delivered",
+    "Order has been delivered",
 }
 
 
