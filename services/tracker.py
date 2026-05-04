@@ -25,13 +25,13 @@ def get_common_headers():
         "origin": "https://www.google.com",
         "priority": "u=1, i",
         "referer": "https://www.google.com/",
-        "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
+        "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
     }
 
 
@@ -426,7 +426,7 @@ def delhivery_track(num: str) -> dict:
             "wbn": num,
         }
         res = requests.get(
-            "https://dlv-api.delhivery.com/v3/unified-tracking",
+            "https://dlv-api.delhivery.com/v3/unified-tracking-new",
             params=params,
             headers=headers,
             timeout=REQUEST_TIMEOUT,
@@ -439,39 +439,42 @@ def delhivery_track(num: str) -> dict:
 
         data = res.json()
 
-        if res.status_code != 200:
-            logger.error("Error fetching from delhivery")
-            return status
-
         events = []
         if data.get("message") != "Success":
             return status
 
-        tracking_events = data["data"][0]["trackingStates"][-1]
+        tracking_items = data.get("data") or []
+        tracking_item = tracking_items[0] if tracking_items else {}
+        tracking_states = tracking_item.get("trackingStates") or []
+        latest_tracking_state = tracking_states[-1] if tracking_states else {}
+        scans = latest_tracking_state.get("scans") or []
+        latest_scan = scans[-1] if scans else {}
+        current_status = tracking_item.get("status") or {}
 
         # delhivery has a different format
-        date_time = (
-            tracking_events["scans"][-1]["scanDateTime"]
-            or data["data"][0]["status"]["statusDateTime"]
+        date_time = parse_date_time_string(
+            latest_scan.get("scanDateTime") or current_status.get("statusDateTime")
         )
-        date_time = parse_date_time_string(date_time)
-        details = tracking_events["scans"][-1]["scanNslRemark"]
-        location = tracking_events["scans"][-1]["cityLocation"]
-        events.append(
-            {
-                "location": location,
-                "details": details,
-                "date_time": date_time,
-            }
+        details = (
+            latest_scan.get("scanNslRemark")
+            or latest_scan.get("scan")
+            or current_status.get("instructions")
+            or current_status.get("status")
         )
+        location = latest_scan.get("cityLocation") or tracking_item.get("destination")
+
+        if date_time or details or location:
+            events.append(
+                {
+                    "location": location,
+                    "details": details,
+                    "date_time": date_time,
+                }
+            )
 
         status["events"] = events
         status["service"] = "delhivery"
-        status["eta"] = parse_date_time_string(
-            data["data"][0].get("promiseDeliveryDate", "")
-        )
-
-        print(status)
+        status["eta"] = parse_date_time_string(tracking_item.get("promiseDeliveryDate"))
 
     except Exception as e:
         logger.error(f"An error occurred fetching from delhivery : {e}")
