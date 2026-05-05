@@ -279,6 +279,22 @@
     let searchDebounce = null;
     const openPackages = new Set();
 
+    function formatDateTime(dateTime) {
+      if (!dateTime) return '-';
+
+      const date = new Date(dateTime);
+      if (Number.isNaN(date.getTime())) return dateTime;
+
+      return new Intl.DateTimeFormat(undefined, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(date);
+    }
+
     function loadCachedPackagesToDom() {
       try {
         const cachedText = localStorage.getItem(TRACK_CACHE_KEY);
@@ -414,7 +430,7 @@
       const formData = new FormData(this);
       const jsonData = {};
       for (let [key, value] of formData.entries()) {
-        jsonData[key] = value;
+        jsonData[key] = key === 'number' ? value.trim() : value;
       }
 
       // Show loading state
@@ -536,7 +552,7 @@
             row.innerHTML = `
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.date_time || '-'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${formatDateTime(event.date_time)}</td>
             `;
             eventsTable.appendChild(row);
           });
