@@ -18,6 +18,32 @@ from utils.common import parse_date_time_string
 REQUEST_TIMEOUT = 120
 
 
+def _parse_json_object_from_text(response_text):
+    if isinstance(response_text, dict):
+        return response_text
+
+    if not isinstance(response_text, str) or not response_text.strip():
+        return None
+
+    text = response_text.strip()
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fenced_match:
+        text = fenced_match.group(1).strip()
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        object_match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not object_match:
+            return None
+        try:
+            parsed = json.loads(object_match.group(0))
+        except json.JSONDecodeError:
+            return None
+
+    return parsed if isinstance(parsed, dict) else None
+
+
 def get_common_headers():
     return {
         "accept": "application/json, text/plain, */*",
@@ -166,14 +192,17 @@ def dtdc_track_by_browser(num: str) -> dict:
     status = {"events": None, "service": None}
     try:
         response_text = dtdc_track_srv(num)
-        try:
-            response_text = json.loads(response_text)
-        except Exception as e:
-            logger.error(error=f"Error parsing JSON: {e}")
+        response_data = _parse_json_object_from_text(response_text)
+        if not response_data:
+            logger.error(f"Unable to parse DTDC browser response: {response_text}")
+            return status
 
-        timeline_steps = response_text.get("milestones", [])
+        timeline_steps = response_data.get("milestones") or []
         location_details = []
         for item in timeline_steps:
+            if not isinstance(item, dict):
+                continue
+
             details = item.get("event", "")
             location = item.get("location", "")
             datetime_text = item.get("date", "") or item.get("timestamp", "")
@@ -194,12 +223,18 @@ def dtdc_track_by_browser(num: str) -> dict:
             }
             location_details.append(parsed_data)
 
+        if not location_details:
+            return status
+
         location_details.reverse()
         status["events"] = location_details
         status["service"] = "dtdc"
+        status["eta"] = parse_date_time_string(
+            response_data.get("estimated_delivery_date")
+        )
 
     except Exception as e:
-        logger.error("An error occurred fetching from dtdc", e)
+        logger.error(f"An error occurred fetching from dtdc: {e}")
     return status
 
 

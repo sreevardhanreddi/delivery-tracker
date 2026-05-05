@@ -97,9 +97,13 @@ def wait_for_network_idle(driver, timeout=30):
 
 def dtdc_track_srv(tracking_number: str):
     link = "https://www.dtdc.in/trace.asp"
-    query = "given the tracking number {}, provide a json response you receive directly, no yapping, thank you".format(
-        tracking_number
-    )
+    query = (
+        "Track DTDC shipment {tracking_number}. Return only one valid JSON object, "
+        "without markdown fences or extra text. Use this schema exactly: "
+        '{{"tracking_number":"{tracking_number}","origin_city":"","destination_city":"",'
+        '"current_status":"","estimated_delivery_date":"","milestones":['
+        '{{"event":"","location":"","timestamp":""}}]}}'
+    ).format(tracking_number=tracking_number)
 
     # Configure Chrome options
     chrome_options = Options()
