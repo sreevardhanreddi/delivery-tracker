@@ -84,6 +84,52 @@
         transform: rotate(360deg);
       }
     }
+
+    @media (max-width: 640px) {
+      .tracking-events-wrapper {
+        overflow-x: visible;
+      }
+
+      .tracking-events-table,
+      .tracking-events-table tbody,
+      .tracking-events-table tr,
+      .tracking-events-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .tracking-events-table thead {
+        display: none;
+      }
+
+      .tracking-events-table tr {
+        padding: 0.75rem 1rem;
+      }
+
+      .tracking-events-table td {
+        padding: 0.35rem 0;
+        white-space: normal;
+      }
+
+      .tracking-events-table td[data-label] {
+        display: grid;
+        grid-template-columns: minmax(5rem, 32%) 1fr;
+        gap: 0.75rem;
+      }
+
+      .tracking-events-table td[data-label]::before {
+        color: #6b7280;
+        content: attr(data-label);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .dark .tracking-events-table td[data-label]::before {
+        color: #9ca3af;
+      }
+    }
   </style>
 </head>
 
@@ -240,8 +286,8 @@
       </div>
 
       <!-- Events table (collapsible) -->
-      <div class="accordion-content mt-4 overflow-x-auto hidden">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+      <div class="accordion-content tracking-events-wrapper mt-4 overflow-x-auto hidden">
+        <table class="tracking-events-table min-w-full divide-y divide-gray-200 dark:divide-dark-border">
           <thead class="bg-gray-50 dark:bg-gray-800">
             <tr>
               <th scope="col"
@@ -550,9 +596,9 @@
           events.forEach(event => {
             const row = document.createElement('tr');
             row.innerHTML = `
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${formatDateTime(event.date_time)}</td>
+              <td data-label="Details" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.details || '-'}</td>
+              <td data-label="Location" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${event.location || '-'}</td>
+              <td data-label="Date" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${formatDateTime(event.date_time)}</td>
             `;
             eventsTable.appendChild(row);
           });
