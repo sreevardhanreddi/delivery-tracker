@@ -175,5 +175,7 @@ async def refresh_package(num: str, session: Session = Depends(get_session)):
     if package is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
-    await update_package_tracking(package.id, package.number)
+    await update_package_tracking(
+        package.id, package.number, (package.service or "").strip() or None
+    )
     return {"success": True, "message": "Package refreshed"}

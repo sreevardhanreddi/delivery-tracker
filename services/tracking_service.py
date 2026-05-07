@@ -5,14 +5,18 @@ from database.connection import engine
 from models.track_package import TrackPackage
 from models.tracking_event import TrackingEvent
 from services.telegram import send_message
-from services.tracker import track_all
+from services.tracker import track_all, track_by_service
 from utils.common import dict_to_str, normalize_package_status, parse_date_time_string
 
 
-async def update_package_tracking(package_id: int, tracking_number: str):
+async def update_package_tracking(
+    package_id: int, tracking_number: str, service: str | None = None
+):
     """Update package tracking information in the background."""
-    # Run the synchronous track_all function in a separate thread
-    status = await asyncify(track_all)(tracking_number)
+    service = service.strip() if service else None
+    tracker = track_by_service if service else track_all
+    args = (tracking_number, service) if service else (tracking_number,)
+    status = await asyncify(tracker)(*args)
 
     with Session(engine) as session:
         package = session.get(TrackPackage, package_id)
