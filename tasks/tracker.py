@@ -47,8 +47,9 @@ async def update_packages_status():
             has_changed = latest_event_in_db is None
             if has_changed:
                 package.status = normalize_package_status(events[0]["details"])
-                eta = status.get("eta", "")
-                package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
+                eta = status.get("eta")
+                if eta:
+                    package.eta = eta.strftime("%Y-%m-%d %H:%M:%S")
                 session.add(package)
                 session.commit()
 

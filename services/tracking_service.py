@@ -33,8 +33,9 @@ async def update_package_tracking(
 
         package.service = status.get("service", "")
         package.status = normalize_package_status(events[0]["details"])
-        eta = status.get("eta", "")
-        package.eta = eta.strftime("%Y-%m-%d %H:%M:%S") if eta else ""
+        eta = status.get("eta")
+        if eta:
+            package.eta = eta.strftime("%Y-%m-%d %H:%M:%S")
         session.add(package)
         session.commit()
 
