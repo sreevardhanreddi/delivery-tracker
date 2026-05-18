@@ -64,6 +64,8 @@ DELIVERED_STATUSES = {
     "Shipment delivered",
     "Shipment has been delivered",
     "Order has been delivered",
+    "Package delivered successfully after verification",
+    "Package delivered successfully",
 }
 
 
