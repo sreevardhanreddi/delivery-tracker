@@ -644,6 +644,146 @@ def shree_maruti_track(num: str) -> dict:
     return status
 
 
+# Amazon ships status as i18n keys (e.g. "swa_rex_detail_pickedUp") rather than
+# readable text. Map the common ones; fall back to humanizing the key otherwise.
+AMAZON_STATUS_STRINGS = {
+    "swa_rex_shipping_label_created": "Shipping label created",
+    "swa_rex_detail_creation_confirmed": "Order received",
+    "swa_rex_detail_pickedUp": "Picked up",
+    "swa_rex_arrived_at_sort_center": "Arrived at carrier facility",
+    "swa_rex_detail_departed": "Departed carrier facility",
+    "swa_rex_intransit": "In transit",
+    "swa_rex_detail_intransit": "In transit",
+    "swa_rex_ofd": "Out for delivery",
+    "swa_rex_detail_ofd": "Out for delivery",
+    "swa_rex_delivering_eddday": "Arriving today",
+    "swa_rex_detail_delivered": "Delivered",
+    "swa_rex_delivered": "Delivered",
+    "swa_rex_detail_delivery_attempted": "Delivery attempted",
+}
+
+
+def _humanize_amazon_status(localised_string_id: str) -> str:
+    if not localised_string_id:
+        return ""
+    if localised_string_id in AMAZON_STATUS_STRINGS:
+        return AMAZON_STATUS_STRINGS[localised_string_id]
+    text = localised_string_id
+    for prefix in ("swa_rex_detail_", "swa_rex_"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    return text.replace("_", " ").strip().capitalize()
+
+
+def _format_amazon_location(location: dict) -> str:
+    if not isinstance(location, dict):
+        return ""
+    parts = [
+        location.get("city"),
+        location.get("stateProvince"),
+        location.get("postalCode"),
+    ]
+    return ", ".join(p for p in parts if p)
+
+
+def amazon_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with amazon_track")
+    status = {"events": None, "service": None}
+    try:
+        tracking_url = f"https://track.amazon.in/tracking/{num}?trackingId={num}"
+        session = requests.Session()
+        headers = {
+            **get_common_headers(),
+            "origin": "https://track.amazon.in",
+            "referer": tracking_url,
+            "sec-fetch-site": "same-origin",
+        }
+
+        # The tracking API requires an anti-CSRF token rendered in the page along
+        # with the anonymous session cookies set on that first request.
+        page_res = session.get(tracking_url, headers=headers, timeout=REQUEST_TIMEOUT)
+        if page_res.status_code != 200:
+            logger.error(
+                f"Failed to load Amazon tracking page. Status code: {page_res.status_code}"
+            )
+            return status
+
+        csrf_match = re.search(r'name="CSRF-TOKEN"\s+content="([^"]+)"', page_res.text)
+        if not csrf_match:
+            logger.error("Unable to find Amazon CSRF token on tracking page")
+            return status
+
+        api_res = session.get(
+            f"https://track.amazon.in/api/tracker/{num}",
+            headers={**headers, "anti-csrftoken-a2z": csrf_match.group(1)},
+            timeout=REQUEST_TIMEOUT,
+        )
+        if api_res.status_code != 200:
+            logger.error(
+                f"Failed to fetch data from Amazon API. Status code: {api_res.status_code}"
+            )
+            return status
+
+        payload = api_res.json()
+
+        # progressTracker and eventHistory arrive as nested JSON strings.
+        event_history_raw = payload.get("eventHistory")
+        event_history = (
+            json.loads(event_history_raw)
+            if isinstance(event_history_raw, str)
+            else (event_history_raw or {})
+        )
+        history_items = event_history.get("eventHistory") or []
+
+        events = []
+        for item in history_items:
+            details = _humanize_amazon_status(
+                (item.get("statusSummary") or {}).get("localisedStringId", "")
+            )
+            if not details:
+                continue
+            events.append(
+                {
+                    "location": _format_amazon_location(item.get("location")),
+                    "details": details,
+                    "date_time": parse_date_time_string(item.get("eventTime")),
+                }
+            )
+
+        if not events:
+            return status
+
+        events.sort(
+            key=lambda e: e.get("date_time") or datetime.min,
+            reverse=True,
+        )
+
+        eta = None
+        progress_raw = payload.get("progressTracker")
+        progress = (
+            json.loads(progress_raw)
+            if isinstance(progress_raw, str)
+            else (progress_raw or {})
+        )
+        metadata = (progress.get("summary") or {}).get("metadata") or {}
+        for key in ("expectedDeliveryDate", "promisedDeliveryDate"):
+            value = metadata.get(key) or {}
+            if value.get("date"):
+                eta = parse_date_time_string(value.get("date"))
+                if eta:
+                    break
+
+        status["events"] = events
+        status["service"] = "amazon"
+        status["eta"] = eta
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from amazon: {e}")
+
+    return status
+
+
 def track_by_service(num: str, service: str) -> dict:
     logger.info(f"Tracking {num} with {service}")
     status = {"events": None, "service": None}
@@ -663,6 +803,8 @@ def track_by_service(num: str, service: str) -> dict:
         return xpressbees_track_by_browser(num)
     elif service == "shree_maruti":
         return shree_maruti_track(num)
+    elif service == "amazon":
+        return amazon_track(num)
     else:
         logger.error(f"Invalid service: {service}")
         return status
@@ -679,6 +821,7 @@ def track_all(num: str) -> dict:
         delhivery_track,
         shadow_fax_track,
         shree_maruti_track,
+        amazon_track,
         # ekart_track,  # Disabled due to CSRF validation issues - too complex for API-only approach
     ]
 

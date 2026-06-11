@@ -57,6 +57,13 @@ const courierLogos = {
     alt: "Shree Maruti Logo",
     trackUrl: "https://shreemaruti.com/track-shipment/{trackingNumber}",
   },
+  amazon: {
+    name: "Amazon",
+    color: "bg-gray-800",
+    logo: "https://www.amazon.in/favicon.ico",
+    alt: "Amazon Logo",
+    trackUrl: "https://track.amazon.in/tracking/{trackingNumber}",
+  },
   unknown: {
     name: "Unknown",
     color: "bg-gray-500",
@@ -88,6 +95,8 @@ function getCourierService(service) {
     return courierLogos.xpressbees;
   } else if (service === "shree_maruti") {
     return courierLogos.shree_maruti;
+  } else if (service === "amazon") {
+    return courierLogos.amazon;
   } else {
     return courierLogos.unknown;
   }

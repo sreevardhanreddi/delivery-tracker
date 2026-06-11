@@ -2,6 +2,9 @@ ARG VERSION=3.12
 
 FROM python:${VERSION}-bookworm
 
+# uv: fast dependency installer/resolver (https://github.com/astral-sh/uv)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /code
 
 # Install dependencies
@@ -26,7 +29,8 @@ RUN echo "Chrome version:" && chromium --version && \
 
 COPY ./requirements.txt /code/requirements.txt
 
-RUN pip install -r /code/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r /code/requirements.txt
 
 COPY . /code
 
