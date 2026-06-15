@@ -652,6 +652,8 @@ AMAZON_STATUS_STRINGS = {
     "swa_rex_detail_pickedUp": "Picked up",
     "swa_rex_arrived_at_sort_center": "Arrived at carrier facility",
     "swa_rex_detail_departed": "Departed carrier facility",
+    "swa_rex_arrived_at_final_hub": "Arrived at delivery hub",
+    "swa_rex_detail_arrived_at_delivery_center": "Out for delivery",
     "swa_rex_intransit": "In transit",
     "swa_rex_detail_intransit": "In transit",
     "swa_rex_ofd": "Out for delivery",
@@ -660,15 +662,16 @@ AMAZON_STATUS_STRINGS = {
     "swa_rex_detail_delivered": "Delivered",
     "swa_rex_delivered": "Delivered",
     "swa_rex_detail_delivery_attempted": "Delivery attempted",
+    "swa_rex_detail_delivery_attempted_1": "Delivery attempted",
 }
 
 
 def _humanize_amazon_status(localised_string_id: str) -> str:
     if not localised_string_id:
         return ""
-    if localised_string_id in AMAZON_STATUS_STRINGS:
-        return AMAZON_STATUS_STRINGS[localised_string_id]
-    text = localised_string_id
+    text = localised_string_id.lower()
+    if text in AMAZON_STATUS_STRINGS:
+        return AMAZON_STATUS_STRINGS[text]
     for prefix in ("swa_rex_detail_", "swa_rex_"):
         if text.startswith(prefix):
             text = text[len(prefix) :]
