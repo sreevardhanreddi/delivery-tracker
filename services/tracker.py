@@ -787,6 +787,93 @@ def amazon_track(num: str) -> dict:
     return status
 
 
+def vxpress_track(num: str) -> dict:
+    logger.info(f"Tracking {num} with vxpress_track")
+    status = {"events": None, "service": None}
+    try:
+        headers = {
+            **get_common_headers(),
+            "accept": "*/*",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": "https://vxpress.in",
+            "referer": "https://vxpress.in/track-result",
+            "sec-fetch-site": "same-origin",
+            "x-requested-with": "XMLHttpRequest",
+        }
+        res = requests.post(
+            "https://vxpress.in/sx_trackapi_new.php",
+            data={"iTrackingNumber": num, "isTrace": 1},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if res.status_code != 200:
+            logger.error(
+                f"Failed to fetch data from VXpress API. Status code: {res.status_code}"
+            )
+            return status
+
+        soup = bs4.BeautifulSoup(res.text, "html.parser")
+        # The page renders two "shipment-detail-tbl" tables: the docket summary and
+        # the scan history. Grab the scan history from its "StatusAndScan" container.
+        scan_container = soup.find(id="StatusAndScan")
+        scan_table = (
+            scan_container.find("table", class_="shipment-detail-tbl")
+            if scan_container
+            else None
+        )
+        if scan_table is None:
+            logger.error("Error fetching the status from vxpress")
+            return status
+
+        events = []
+        for row in scan_table.find_all("tr"):
+            # Skip the header row, which uses <th> instead of <td>.
+            cells = row.find_all("td")
+            if len(cells) != 4:
+                continue
+
+            date_time = parse_date_time_string(
+                "{} {}".format(
+                    cells[2].get_text(strip=True),
+                    cells[3].get_text(strip=True),
+                )
+            )
+            events.append(
+                {
+                    "location": cells[0].get_text(" ", strip=True),
+                    "details": cells[1].get_text(" ", strip=True),
+                    "date_time": date_time,
+                }
+            )
+
+        if not events:
+            return status
+
+        # The table renders oldest-first; surface newest-first like other trackers.
+        events.reverse()
+        status["events"] = events
+        status["service"] = "vxpress"
+
+        # ETA is rendered in the docket detail table as "Estimated Delivery Date".
+        eta = None
+        for row in soup.find_all("tr"):
+            header = row.find("th")
+            value = row.find("td")
+            if (
+                header
+                and value
+                and "Estimated Delivery Date" in header.get_text(strip=True)
+            ):
+                eta = parse_date_time_string(value.get_text(strip=True))
+                break
+        status["eta"] = eta
+
+    except Exception as e:
+        logger.error(f"An error occurred fetching from vxpress: {e}")
+
+    return status
+
+
 def track_by_service(num: str, service: str) -> dict:
     logger.info(f"Tracking {num} with {service}")
     status = {"events": None, "service": None}
@@ -808,6 +895,8 @@ def track_by_service(num: str, service: str) -> dict:
         return shree_maruti_track(num)
     elif service == "amazon":
         return amazon_track(num)
+    elif service == "vxpress":
+        return vxpress_track(num)
     else:
         logger.error(f"Invalid service: {service}")
         return status
@@ -825,6 +914,7 @@ def track_all(num: str) -> dict:
         shadow_fax_track,
         shree_maruti_track,
         amazon_track,
+        vxpress_track,
         # ekart_track,  # Disabled due to CSRF validation issues - too complex for API-only approach
     ]
 

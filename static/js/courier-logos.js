@@ -64,6 +64,13 @@ const courierLogos = {
     alt: "Amazon Logo",
     trackUrl: "https://track.amazon.in/tracking/{trackingNumber}",
   },
+  vxpress: {
+    name: "V-Xpress",
+    color: "bg-red-600",
+    logo: "https://vxpress.in/wp-content/uploads/2025/08/cropped-favicon-1-32x32.png",
+    alt: "V-Xpress Logo",
+    trackUrl: "https://vxpress.in/track-result",
+  },
   unknown: {
     name: "Unknown",
     color: "bg-gray-500",
@@ -97,6 +104,8 @@ function getCourierService(service) {
     return courierLogos.shree_maruti;
   } else if (service === "amazon") {
     return courierLogos.amazon;
+  } else if (service === "vxpress") {
+    return courierLogos.vxpress;
   } else {
     return courierLogos.unknown;
   }
