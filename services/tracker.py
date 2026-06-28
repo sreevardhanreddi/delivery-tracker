@@ -13,7 +13,7 @@ from services.selenium_tracker import (
     ekart_track_srv,
     xpressbees_track_srv,
 )
-from utils.common import parse_date_time_string
+from utils.common import is_delivered_status, parse_date_time_string
 
 REQUEST_TIMEOUT = 120
 
@@ -851,21 +851,33 @@ def vxpress_track(num: str) -> dict:
 
         # The table renders oldest-first; surface newest-first like other trackers.
         events.reverse()
-        status["events"] = events
-        status["service"] = "vxpress"
 
-        # ETA is rendered in the docket detail table as "Estimated Delivery Date".
+        # The docket detail table carries the authoritative overall status and ETA.
+        docket_status = None
         eta = None
         for row in soup.find_all("tr"):
             header = row.find("th")
             value = row.find("td")
-            if (
-                header
-                and value
-                and "Estimated Delivery Date" in header.get_text(strip=True)
-            ):
+            if not (header and value):
+                continue
+            header_text = header.get_text(strip=True)
+            if header_text == "Status":
+                docket_status = value.get_text(" ", strip=True)
+            elif "Estimated Delivery Date" in header_text:
                 eta = parse_date_time_string(value.get_text(strip=True))
-                break
+
+        # V-Xpress logs a trailing "EPOD Copy Received" scan after delivery, so the
+        # newest scan row isn't always the headline status. When the docket reports
+        # delivery, surface the delivery scan event first so downstream status
+        # derivation (events[0]["details"]) reflects it.
+        if docket_status and is_delivered_status(docket_status):
+            for i, event in enumerate(events):
+                if is_delivered_status(event["details"]):
+                    events.insert(0, events.pop(i))
+                    break
+
+        status["events"] = events
+        status["service"] = "vxpress"
         status["eta"] = eta
 
     except Exception as e:

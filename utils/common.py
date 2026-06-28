@@ -72,7 +72,13 @@ DELIVERED_STATUSES = {
 
 
 def is_delivered_status(status: str) -> bool:
-    return str(status) in DELIVERED_STATUSES
+    status = str(status)
+    if status in DELIVERED_STATUSES:
+        return True
+    # V-Xpress reports delivery as "Delivered to <name> (<phone>)".
+    if status.startswith("Delivered to "):
+        return True
+    return False
 
 
 def normalize_package_status(status: str) -> str:
